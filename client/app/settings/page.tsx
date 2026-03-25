@@ -10,20 +10,20 @@ const Settings = () => {
   const isDark = theme === "dark";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background animate-[fade-in_300ms_cubic-bezier(0.16,1,0.3,1)]">
       <div className="max-w-2xl mx-auto px-6 py-8">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors"
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-all duration-200 leading-normal hover:translate-x-[-4px] active:scale-95"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Inbox
         </button>
 
-        <h1 className="text-2xl font-bold text-foreground mb-8">Settings</h1>
+        <h1 className="text-2xl font-semibold text-foreground mb-8 leading-tight animate-[slide-up_300ms_cubic-bezier(0.16,1,0.3,1)_100ms_backwards]">Settings</h1>
 
         <div className="space-y-6">
-          <div className="border border-border rounded-lg p-5">
+          <div className="border border-border rounded-lg p-5 animate-[slide-up_300ms_cubic-bezier(0.16,1,0.3,1)_200ms_backwards] transition-all duration-200 hover:border-foreground/20 hover:shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {isDark ? (
@@ -32,10 +32,10 @@ const Settings = () => {
                   <Sun className="h-5 w-5 text-muted-foreground" />
                 )}
                 <div>
-                  <p className="text-sm font-medium text-foreground">
+                  <p className="text-sm font-medium text-foreground leading-tight">
                     Dark theme
                   </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-sm text-muted-foreground mt-1 leading-normal">
                     Switch between light and dark appearance
                   </p>
                 </div>

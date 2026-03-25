@@ -35,9 +35,9 @@ export default function Home() {
         <ChatView chat={activeChat} onSend={handleSend} />
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
-          <div className="text-center">
-            <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">Select a conversation</p>
+          <div className="text-center animate-[fade-in_400ms_cubic-bezier(0.16,1,0.3,1)]">
+            <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-30 animate-[float_3s_ease-in-out_infinite]" />
+            <p className="text-base leading-normal">Select a conversation</p>
           </div>
         </div>
       )}
