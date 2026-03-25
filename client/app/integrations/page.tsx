@@ -71,7 +71,8 @@ const Integrations = () => {
               <div
                 className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110"
                 style={{
-                  backgroundColor: item.color + "15",  /* 15% opacity for subtle background */
+                  backgroundColor:
+                    item.color + "15" /* 15% opacity for subtle background */,
                   color: item.color,
                 }}
               >

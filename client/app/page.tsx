@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import { useState } from "react";
 import { MessageSquare } from "lucide-react";
 import { chats as initialChats, Chat, Message } from "./data/mockChats";
