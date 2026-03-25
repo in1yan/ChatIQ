@@ -47,7 +47,7 @@ const Integrations = () => {
       <div className="max-w-2xl mx-auto px-6 py-8">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-all duration-200 leading-normal hover:translate-x-[-4px] active:scale-95"
+          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-8 transition-all duration-200 leading-normal hover:translate-x-[-4px] active:scale-95"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Inbox
@@ -66,16 +66,16 @@ const Integrations = () => {
             <div
               key={item.id}
               style={{ animationDelay: `${200 + index * 75}ms` }}
-              className="border border-border rounded-lg p-5 flex items-center gap-4 animate-[slide-up_300ms_cubic-bezier(0.16,1,0.3,1)_backwards] transition-all duration-200 hover:border-foreground/20 hover:shadow-md hover:translate-y-[-2px]"
+              className="group border border-border rounded-lg p-5 flex items-center gap-4 animate-[slide-up_300ms_cubic-bezier(0.16,1,0.3,1)_backwards] transition-all duration-200 hover:border-primary/30 hover:shadow-md hover:shadow-primary/5 hover:translate-y-[-2px]"
             >
               <div
-                className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0"
+                className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110"
                 style={{
-                  backgroundColor: item.color + "20",
+                  backgroundColor: item.color + "15",  /* 15% opacity for subtle background */
                   color: item.color,
                 }}
               >
-                <item.icon className="h-5 w-5" />
+                <item.icon className="h-5 w-5" strokeWidth={2.5} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
@@ -85,7 +85,7 @@ const Integrations = () => {
                   {item.connected && (
                     <Badge
                       variant="secondary"
-                      className="text-xs px-2 py-0.5 leading-none"
+                      className="text-xs px-2 py-0.5 leading-none bg-success/10 text-success border-success/20"
                     >
                       Connected
                     </Badge>

@@ -38,7 +38,10 @@ export function ChatView({ chat, onSend }: ChatViewProps) {
           <p className="text-sm font-semibold text-foreground leading-tight">
             {chat.name}
           </p>
-          <p className="text-xs text-muted-foreground mt-1">Online</p>
+          <p className="text-xs mt-1 flex items-center gap-1.5 leading-tight">
+            <span className="w-1.5 h-1.5 rounded-full bg-online"></span>
+            <span className="text-online font-medium">Online</span>
+          </p>
         </div>
       </div>
 
@@ -98,7 +101,7 @@ export function ChatView({ chat, onSend }: ChatViewProps) {
           <button
             onClick={handleSend}
             disabled={!text.trim()}
-            className="text-notion-blue hover:opacity-80 transition-all duration-150 disabled:opacity-30 hover:scale-110 active:scale-95 disabled:hover:scale-100"
+            className="text-primary hover:opacity-80 transition-all duration-150 disabled:opacity-30 hover:scale-110 active:scale-95 disabled:hover:scale-100"
           >
             <Send className="h-5 w-5" />
           </button>

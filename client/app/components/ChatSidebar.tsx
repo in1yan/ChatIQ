@@ -32,7 +32,10 @@ export function ChatSidebar({ chats, activeId, onSelect }: ChatSidebarProps) {
             <p className="text-sm font-semibold text-foreground leading-tight">
               {currentUser.name}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">Active</p>
+            <p className="text-xs leading-tight mt-1 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-online"></span>
+              <span className="text-online font-medium">Active</span>
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -74,8 +77,8 @@ export function ChatSidebar({ chats, activeId, onSelect }: ChatSidebarProps) {
             key={chat.id}
             onClick={() => onSelect(chat.id)}
             style={{ animationDelay: `${Math.min(index * 50, 400)}ms` } as React.CSSProperties}
-            className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-200 hover:bg-notion-hover hover:translate-x-0.5 active:scale-[0.98] animate-[slide-up_300ms_cubic-bezier(0.16,1,0.3,1)_backwards] ${
-              activeId === chat.id ? "bg-notion-active" : ""
+            className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-200 hover:bg-notion-hover hover:translate-x-0.5 active:scale-[0.98] animate-[slide-up_300ms_cubic-bezier(0.16,1,0.3,1)_backwards] relative ${
+              activeId === chat.id ? "bg-notion-active before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-primary before:rounded-r" : ""
             }`}
           >
             <div className="relative shrink-0">
@@ -83,8 +86,8 @@ export function ChatSidebar({ chats, activeId, onSelect }: ChatSidebarProps) {
                 <AvatarImage src={chat.avatar} alt={chat.name} />
                 <AvatarFallback>{chat.name[0]}</AvatarFallback>
               </Avatar>
-              <div className="absolute -bottom-0.5 -right-0.5 bg-background rounded-full p-[2px]">
-                <PlatformIcon platform={chat.platform} size={11} />
+              <div className="absolute -bottom-0.5 -right-0.5">
+                <PlatformIcon platform={chat.platform} size={10} showBackground />
               </div>
             </div>
             <div className="flex-1 min-w-0">
@@ -101,7 +104,7 @@ export function ChatSidebar({ chats, activeId, onSelect }: ChatSidebarProps) {
               </p>
             </div>
             {chat.unread > 0 && (
-              <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-notion-blue text-xs font-medium flex items-center justify-center shrink-0 text-primary-foreground leading-none">
+              <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-primary text-xs font-semibold flex items-center justify-center shrink-0 text-primary-foreground leading-none shadow-sm">
                 {chat.unread}
               </span>
             )}

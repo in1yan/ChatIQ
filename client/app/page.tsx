@@ -36,7 +36,9 @@ export default function Home() {
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
           <div className="text-center animate-[fade-in_400ms_cubic-bezier(0.16,1,0.3,1)]">
-            <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-30 animate-[float_3s_ease-in-out_infinite]" />
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/5 flex items-center justify-center">
+              <MessageSquare className="h-8 w-8 text-primary/40 animate-[float_3s_ease-in-out_infinite]" />
+            </div>
             <p className="text-base leading-normal">Select a conversation</p>
           </div>
         </div>
