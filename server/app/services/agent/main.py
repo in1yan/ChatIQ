@@ -19,14 +19,18 @@ from pydantic_ai import (
     UnexpectedModelBehavior,
     UserPromptPart,
 )
+from pydantic_ai.models.groq import GroqModel
+from pydantic_ai.providers.groq import GroqProvider
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models import Customer, Message
 
 # Global agent instance (lazy initialization)
 _agent: Agent | None = None
+model = "qwen/qwen3-32b"
 
 
 def get_agent() -> Agent:
@@ -35,7 +39,8 @@ def get_agent() -> Agent:
     if _agent is None:
         # Initialize the AI agent with OpenAI GPT-5.2
         # Make sure OPENAI_API_KEY is set in environment
-        _agent = Agent("openai:gpt-5.2")
+        gm = GroqModel(model, provider=GroqProvider(api_key=settings.GROQ_API_KEY))
+        _agent = Agent(model=gm)
     return _agent
 
 
@@ -143,9 +148,7 @@ async def get_customer_messages(
         List of Pydantic AI ModelMessage objects
     """
     result = await db.execute(
-        select(Message)
-        .where(Message.customer_id == customer_id)
-        .order_by(Message.id)
+        select(Message).where(Message.customer_id == customer_id).order_by(Message.id)
     )
     rows = result.scalars().all()
 
@@ -156,9 +159,7 @@ async def get_customer_messages(
     return messages
 
 
-async def save_messages(
-    db: AsyncSession, customer_id: int, messages: bytes
-) -> None:
+async def save_messages(db: AsyncSession, customer_id: int, messages: bytes) -> None:
     """
     Save new messages for a customer.
 
@@ -173,6 +174,46 @@ async def save_messages(
     )
     db.add(message)
     await db.commit()
+
+
+async def get_chat_response(prompt: str, customer_id: int, db: AsyncSession) -> dict:
+    """
+    Get complete chat response from the AI agent (non-streaming).
+
+    Args:
+        prompt: User's message/prompt
+        customer_id: Customer ID for message history
+        db: Database session
+
+    Returns:
+        Dictionary with user message and AI response
+    """
+    # Get chat history for context
+    messages = await get_customer_messages(db, customer_id)
+
+    # Get the agent instance
+    agent = get_agent()
+
+    # Run the agent and wait for complete response
+    result = await agent.run(prompt, message_history=messages)
+
+    # Save new messages to database
+    await save_messages(db, customer_id, result.new_messages_json())
+
+    # Return structured response
+    return {
+        "user_message": {
+            "role": "user",
+            "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+            "content": prompt,
+        },
+        "ai_response": {
+            "role": "model",
+            "timestamp": result.timestamp().isoformat(),
+            "content": result.output,
+        },
+        "customer_id": customer_id,
+    }
 
 
 async def stream_chat_response(
@@ -216,4 +257,3 @@ async def stream_chat_response(
 
     # Save new messages to database
     await save_messages(db, customer_id, result.new_messages_json())
-

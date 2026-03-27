@@ -103,17 +103,22 @@ Invoke-RestMethod -Uri "http://localhost:8000/api/v1/chat/1"
 
 ## Response Format
 
-### Streaming Response (POST /api/v1/chat/)
-Newline-delimited JSON:
+### Complete Response (POST /api/v1/chat/)
+JSON response with user message and AI response:
 ```json
-{"role": "user", "timestamp": "2024-03-27T12:00:00", "content": "Hello"}
-{"role": "model", "timestamp": "2024-03-27T12:00:01", "content": "Hi! How can I help?"}
-```
-
-### Response Headers
-```
-X-Customer-ID: 123
-X-Customer-Channel: whatsapp
+{
+  "user_message": {
+    "role": "user",
+    "timestamp": "2024-03-27T12:00:00Z",
+    "content": "Hello, I need help"
+  },
+  "ai_response": {
+    "role": "model",
+    "timestamp": "2024-03-27T12:00:01Z",
+    "content": "Hello! I'm here to help. What do you need assistance with?"
+  },
+  "customer_id": 123
+}
 ```
 
 ### Chat History Response (GET /api/v1/chat/{id})
@@ -205,16 +210,17 @@ Access interactive API docs:
 
 ## Expected Behavior
 
-✅ **First message from new identifier**: Creates customer, saves message, returns AI response  
+✅ **First message from new identifier**: Creates customer, saves message, returns complete AI response  
 ✅ **Follow-up from same identifier**: Retrieves customer, loads history, AI has context  
 ✅ **Different channels**: Each channel treated independently  
-✅ **Streaming**: Response streams in real-time as AI generates  
+✅ **Complete response**: Returns full AI response in single JSON object  
 ✅ **Persistence**: All messages saved to PostgreSQL  
-✅ **Isolation**: Customers only see their own messages  
+✅ **Isolation**: Customers only see their own messages
 
 ## Performance Notes
 
 - Customer lookup: Indexed on phone_number and email
 - Message retrieval: Indexed on customer_id
-- Streaming: Minimal latency with debounce_by=0.01s
+- Complete response: Waits for full AI response before returning
 - Database: Async operations throughout
+- Response time: Depends on AI model processing time (~2-10 seconds)
