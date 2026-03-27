@@ -1,10 +1,11 @@
 from datetime import datetime
 from typing import Optional
 
-from db.session import Base
 from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
+
+from app.db.session import Base
 
 
 class User(Base):

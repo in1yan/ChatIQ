@@ -3,14 +3,15 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse, Response
+from sqlalchemy.ext.asyncio import AsyncSession
+from supabase_auth.errors import AuthApiError
 
 from app.core.config import settings
+from app.db.session import get_db
 from app.dependancies.auth import get_current_user
 from app.schemas.auth import RefreshTokenRequest
 from app.services.auth import create_user
-from supabase_auth.errors import AuthApiError
 from app.services.supabase import (
-    check_domain,
     exchange_code_for_session,
     initiate_oauth_signin,
     supabase_client,
@@ -20,7 +21,9 @@ router = APIRouter()
 
 
 @router.get("/oauth/callback")
-async def oauth_callback(code: Optional[str] = Query(None)):
+async def oauth_callback(
+    code: Optional[str] = Query(None), db: AsyncSession = Depends(get_db)
+):
     """
     OAuth callback endpoint that redirects to frontend with tokens
     """
@@ -47,13 +50,7 @@ async def oauth_callback(code: Optional[str] = Query(None)):
         return RedirectResponse(url=f"{frontend_url}/auth/error?{error_params}")
 
     email = result.user.email
-    if not email or not check_domain(email, settings.ALLOWED_EMAIL_DOMAINS):
-        error_params = urlencode(
-            {"error": "domain_not_allowed", "message": "Email domain not allowed"}
-        )
-        return RedirectResponse(url=f"{frontend_url}/auth/error?{error_params}")
-
-    await create_user(result.user)
+    await create_user(db, result.user)
 
     refresh_token = result.session.refresh_token
     redirect_url = f"{frontend_url}/auth/success#refresh_token={refresh_token}"
