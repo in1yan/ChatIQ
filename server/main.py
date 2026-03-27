@@ -1,15 +1,12 @@
 from typing import Callable, cast
+
 import uvicorn
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.v1.api import api_router
 from app.core.config import settings
-from app.core.rate_limiter import limiter
 from app.db.session import init_db
 
 app = FastAPI(
@@ -21,13 +18,6 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
-app.state.limiter = limiter
-app.add_exception_handler(
-    RateLimitExceeded,
-    cast(Callable[[Request, Exception], Response], _rate_limit_exceeded_handler),
-)
-
-app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,7 +33,7 @@ async def root():
     """Root endpoint - health check"""
     return JSONResponse(
         content={
-            "message": "Film Club OTT API",
+            "message": settings.APP_NAME,
             "version": settings.APP_VERSION,
             "status": "running",
             "docs": "/api/docs",
