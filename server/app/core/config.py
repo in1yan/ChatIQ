@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     PORT: int = 8000
     ALLOWED_HOSTS: List[str] = ["*"]
     FRONTEND_URL: str = "http://localhost:5173"
+    # AI services
+    GROQ_API_KEY: str
     # supabase config
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""

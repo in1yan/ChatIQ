@@ -12,20 +12,11 @@ class UserResponse(BaseModel):
     provider: Optional[str] = Field(
         None, description="OAuth provider used for authentication"
     )
-    avatar: Optional[str] = Field(None, description="Profile image")
     full_name: Optional[str] = Field(None, description="User's full name")
     is_active: Optional[bool] = Field(
         default=True, description="Whether the user account is active"
     )
     created_at: datetime = Field(..., description="Account creation timestamp")
-    is_admin: Optional[bool] = Field(
-        default=False, description="Whether the user account is admin"
-    )
-    model_config = ConfigDict(from_attributes=True)
-
-
-class UserResponseWithHistory(UserResponse):
-    recently_watched: List[WatchHistory]
     model_config = ConfigDict(from_attributes=True)
 
 
