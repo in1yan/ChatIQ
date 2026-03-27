@@ -1,21 +1,14 @@
+"""
+Agent service module for AI-powered customer chat.
+Provides business logic functions for customer management and chat streaming.
+"""
+
 from __future__ import annotations as _annotations
 
-import asyncio
 import json
-import sqlite3
-from collections.abc import AsyncIterator, Callable
-from concurrent.futures.thread import ThreadPoolExecutor
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from datetime import datetime, timezone
-from functools import partial
-from pathlib import Path
-from typing import Annotated, Any, Literal, TypeVar
+from typing import AsyncIterator, Literal
 
-import fastapi
-import logfire
-from fastapi import Depends, Request
-from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic_ai import (
     Agent,
     ModelMessage,
@@ -26,37 +19,28 @@ from pydantic_ai import (
     UnexpectedModelBehavior,
     UserPromptPart,
 )
-from typing_extensions import LiteralString, ParamSpec, TypedDict
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-agent = Agent("openai:gpt-5.2")
-THIS_DIR = Path(__file__).parent
+from app.models import Customer, Message
 
-
-@asynccontextmanager
-async def lifespan(_app: fastapi.FastAPI):
-    async with Database.connect() as db:
-        yield {"db": db}
+# Global agent instance (lazy initialization)
+_agent: Agent | None = None
 
 
-app = fastapi.FastAPI(lifespan=lifespan)
-logfire.instrument_fastapi(app)
+def get_agent() -> Agent:
+    """Get or create the AI agent instance."""
+    global _agent
+    if _agent is None:
+        # Initialize the AI agent with OpenAI GPT-5.2
+        # Make sure OPENAI_API_KEY is set in environment
+        _agent = Agent("openai:gpt-5.2")
+    return _agent
 
 
-async def get_db(request: Request) -> Database:
-    return request.state.db
-
-
-@app.get("/chat/")
-async def get_chat(database: Database = Depends(get_db)) -> Response:
-    msgs = await database.get_messages()
-    return Response(
-        b"\n".join(json.dumps(to_chat_message(m)).encode("utf-8") for m in msgs),
-        media_type="text/plain",
-    )
-
-
-class ChatMessage(TypedDict):
-    """Format of messages sent to the browser."""
+class ChatMessage(dict):
+    """Format of messages sent to the client."""
 
     role: Literal["user", "model"]
     timestamp: str
@@ -64,141 +48,172 @@ class ChatMessage(TypedDict):
 
 
 def to_chat_message(m: ModelMessage) -> ChatMessage:
+    """Convert Pydantic AI ModelMessage to ChatMessage format."""
     first_part = m.parts[0]
     if isinstance(m, ModelRequest):
         if isinstance(first_part, UserPromptPart):
             assert isinstance(first_part.content, str)
-            return {
-                "role": "user",
-                "timestamp": first_part.timestamp.isoformat(),
-                "content": first_part.content,
-            }
+            return ChatMessage(
+                {
+                    "role": "user",
+                    "timestamp": first_part.timestamp.isoformat(),
+                    "content": first_part.content,
+                }
+            )
     elif isinstance(m, ModelResponse):
         if isinstance(first_part, TextPart):
-            return {
-                "role": "model",
-                "timestamp": m.timestamp.isoformat(),
-                "content": first_part.content,
-            }
+            return ChatMessage(
+                {
+                    "role": "model",
+                    "timestamp": m.timestamp.isoformat(),
+                    "content": first_part.content,
+                }
+            )
     raise UnexpectedModelBehavior(f"Unexpected message type for chat app: {m}")
 
 
-@app.post("/chat/")
-async def post_chat(
-    prompt: Annotated[str, fastapi.Form()], database: Database = Depends(get_db)
-) -> StreamingResponse:
-    async def stream_messages():
-        """Streams new line delimited JSON `Message`s to the client."""
-        # stream the user prompt so that can be displayed straight away
-        yield (
-            json.dumps(
-                {
-                    "role": "user",
-                    "timestamp": datetime.now(tz=timezone.utc).isoformat(),
-                    "content": prompt,
-                }
-            ).encode("utf-8")
-            + b"\n"
-        )
-        # get the chat history so far to pass as context to the agent
-        messages = await database.get_messages()
-        # run the agent with the user prompt and the chat history
-        async with agent.run_stream(prompt, message_history=messages) as result:
-            async for text in result.stream_output(debounce_by=0.01):
-                # text here is a `str` and the frontend wants
-                # JSON encoded ModelResponse, so we create one
-                m = ModelResponse(parts=[TextPart(text)], timestamp=result.timestamp())
-                yield json.dumps(to_chat_message(m)).encode("utf-8") + b"\n"
-
-        # add new messages (e.g. the user prompt and the agent response in this case) to the database
-        await database.add_messages(result.new_messages_json())
-
-    return StreamingResponse(stream_messages(), media_type="text/plain")
-
-
-P = ParamSpec("P")
-R = TypeVar("R")
-
-
-@dataclass
-class Database:
-    """Rudimentary database to store chat messages in SQLite.
-
-    The SQLite standard library package is synchronous, so we
-    use a thread pool executor to run queries asynchronously.
+async def get_or_create_customer(
+    db: AsyncSession,
+    phone: str | None,
+    email: str | None,
+    channel: str,
+    **metadata,
+) -> Customer:
     """
+    Get existing customer or create a new one based on phone/email identifier.
 
-    con: sqlite3.Connection
-    _loop: asyncio.AbstractEventLoop
-    _executor: ThreadPoolExecutor
+    Args:
+        db: Database session
+        phone: Customer phone number (for WhatsApp/Telegram)
+        email: Customer email (for email channel)
+        channel: Communication channel (whatsapp, telegram, email)
+        **metadata: Additional customer data (full_name, telegram_username, etc.)
 
-    @classmethod
-    @asynccontextmanager
-    async def connect(
-        cls, file: Path = THIS_DIR / ".chat_app_messages.sqlite"
-    ) -> AsyncIterator[Database]:
-        with logfire.span("connect to DB"):
-            loop = asyncio.get_event_loop()
-            executor = ThreadPoolExecutor(max_workers=1)
-            con = await loop.run_in_executor(executor, cls._connect, file)
-            slf = cls(con, loop, executor)
-        try:
-            yield slf
-        finally:
-            await slf._asyncify(con.close)
+    Returns:
+        Customer object (existing or newly created)
+    """
+    # Find existing customer
+    query = select(Customer)
+    if phone:
+        query = query.where(Customer.phone_number == phone)
+    elif email:
+        query = query.where(Customer.email == email)
+    else:
+        raise ValueError("Either phone_number or email must be provided")
 
-    @staticmethod
-    def _connect(file: Path) -> sqlite3.Connection:
-        con = sqlite3.connect(str(file))
-        con = logfire.instrument_sqlite3(con)
-        cur = con.cursor()
-        cur.execute(
-            "CREATE TABLE IF NOT EXISTS messages (id INT PRIMARY KEY, message_list TEXT);"
-        )
-        con.commit()
-        return con
+    result = await db.execute(query)
+    existing_customer = result.scalar_one_or_none()
 
-    async def add_messages(self, messages: bytes):
-        await self._asyncify(
-            self._execute,
-            "INSERT INTO messages (message_list) VALUES (?);",
-            messages,
-            commit=True,
-        )
-        await self._asyncify(self.con.commit)
+    if existing_customer:
+        return existing_customer
 
-    async def get_messages(self) -> list[ModelMessage]:
-        c = await self._asyncify(
-            self._execute, "SELECT message_list FROM messages order by id"
-        )
-        rows = await self._asyncify(c.fetchall)
-        messages: list[ModelMessage] = []
-        for row in rows:
-            messages.extend(ModelMessagesTypeAdapter.validate_json(row[0]))
-        return messages
-
-    def _execute(
-        self, sql: LiteralString, *args: Any, commit: bool = False
-    ) -> sqlite3.Cursor:
-        cur = self.con.cursor()
-        cur.execute(sql, args)
-        if commit:
-            self.con.commit()
-        return cur
-
-    async def _asyncify(
-        self, func: Callable[P, R], *args: P.args, **kwargs: P.kwargs
-    ) -> R:
-        return await self._loop.run_in_executor(  # type: ignore
-            self._executor,
-            partial(func, **kwargs),
-            *args,  # type: ignore
-        )
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        "pydantic_ai_examples.chat_app:app", reload=True, reload_dirs=[str(THIS_DIR)]
+    # Create new customer
+    customer = Customer(
+        phone_number=phone,
+        email=email,
+        channel=channel,
+        full_name=metadata.get("full_name"),
+        telegram_username=metadata.get("telegram_username"),
+        extra_data=metadata,
     )
+
+    try:
+        db.add(customer)
+        await db.commit()
+        await db.refresh(customer)
+        return customer
+    except IntegrityError:
+        # Handle race condition - customer was created by another request
+        await db.rollback()
+        result = await db.execute(query)
+        return result.scalar_one()
+
+
+async def get_customer_messages(
+    db: AsyncSession, customer_id: int
+) -> list[ModelMessage]:
+    """
+    Retrieve all messages for a specific customer.
+
+    Args:
+        db: Database session
+        customer_id: Customer ID
+
+    Returns:
+        List of Pydantic AI ModelMessage objects
+    """
+    result = await db.execute(
+        select(Message)
+        .where(Message.customer_id == customer_id)
+        .order_by(Message.id)
+    )
+    rows = result.scalars().all()
+
+    messages: list[ModelMessage] = []
+    for row in rows:
+        # message_data is stored as JSONB, validate and convert to ModelMessage
+        messages.extend(ModelMessagesTypeAdapter.validate_python(row.message_data))
+    return messages
+
+
+async def save_messages(
+    db: AsyncSession, customer_id: int, messages: bytes
+) -> None:
+    """
+    Save new messages for a customer.
+
+    Args:
+        db: Database session
+        customer_id: Customer ID
+        messages: JSON bytes containing Pydantic AI message data
+    """
+    message = Message(
+        customer_id=customer_id,
+        message_data=json.loads(messages),  # Store as dict for JSONB
+    )
+    db.add(message)
+    await db.commit()
+
+
+async def stream_chat_response(
+    prompt: str, customer_id: int, db: AsyncSession
+) -> AsyncIterator[bytes]:
+    """
+    Stream chat response from the AI agent.
+
+    Args:
+        prompt: User's message/prompt
+        customer_id: Customer ID for message history
+        db: Database session
+
+    Yields:
+        JSON-encoded chat messages as bytes (newline-delimited)
+    """
+    # Stream the user prompt so it can be displayed immediately
+    yield (
+        json.dumps(
+            {
+                "role": "user",
+                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                "content": prompt,
+            }
+        ).encode("utf-8")
+        + b"\n"
+    )
+
+    # Get chat history for context
+    messages = await get_customer_messages(db, customer_id)
+
+    # Get the agent instance
+    agent = get_agent()
+
+    # Run the agent with user prompt and chat history
+    async with agent.run_stream(prompt, message_history=messages) as result:
+        async for text in result.stream_output(debounce_by=0.01):
+            # text is a str, convert to ChatMessage format
+            m = ModelResponse(parts=[TextPart(text)], timestamp=result.timestamp())
+            yield json.dumps(to_chat_message(m)).encode("utf-8") + b"\n"
+
+    # Save new messages to database
+    await save_messages(db, customer_id, result.new_messages_json())
+
