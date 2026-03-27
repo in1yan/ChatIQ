@@ -48,3 +48,28 @@ class CustomerResponse(BaseModel):
     channel: str
     full_name: Optional[str]
     created_at: str
+
+
+class ChatResponse(BaseModel):
+    """Response from the chat endpoint."""
+
+    user_message: ChatMessage
+    ai_response: ChatMessage
+    customer_id: int
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "user_message": {
+                    "role": "user",
+                    "timestamp": "2024-03-27T12:00:00Z",
+                    "content": "Hello, I need help",
+                },
+                "ai_response": {
+                    "role": "model",
+                    "timestamp": "2024-03-27T12:00:01Z",
+                    "content": "Hello! I'm here to help. What do you need?",
+                },
+                "customer_id": 123,
+            }
+        }

@@ -36,32 +36,33 @@ async def test_whatsapp_customer():
         )
         
         print(f"Status: {response.status_code}")
-        customer_id = response.headers.get("X-Customer-ID")
-        print(f"Customer ID: {customer_id}")
-        print(f"Channel: {response.headers.get('X-Customer-Channel')}")
         
-        print("\n📨 Streaming response:")
-        print("-" * 60)
-        # Parse streaming response
-        for line in response.text.strip().split("\n"):
-            if line:
-                msg = json.loads(line)
-                role_emoji = "👤" if msg["role"] == "user" else "🤖"
-                print(f"{role_emoji} {msg['role']}: {msg['content']}")
-        print("-" * 60)
-        
-        # Get chat history
-        if customer_id:
-            print(f"\n2️⃣ Fetching chat history for customer {customer_id}...")
-            history_response = await client.get(f"{BASE_URL}/api/v1/chat/{customer_id}")
-            print(f"Status: {history_response.status_code}")
+        # Parse JSON response (no longer streaming)
+        if response.status_code == 200:
+            data = response.json()
+            customer_id = data.get("customer_id")
+            print(f"Customer ID: {customer_id}")
             
-            messages = [
-                json.loads(line)
-                for line in history_response.text.strip().split("\n")
-                if line
-            ]
-            print(f"Total messages in history: {len(messages)}")
+            print("\n📨 Response:")
+            print("-" * 60)
+            print(f"👤 User: {data['user_message']['content']}")
+            print(f"🤖 AI: {data['ai_response']['content']}")
+            print("-" * 60)
+            
+            # Get chat history
+            if customer_id:
+                print(f"\n2️⃣ Fetching chat history for customer {customer_id}...")
+                history_response = await client.get(f"{BASE_URL}/api/v1/chat/{customer_id}")
+                print(f"Status: {history_response.status_code}")
+                
+                messages = [
+                    json.loads(line)
+                    for line in history_response.text.strip().split("\n")
+                    if line
+                ]
+                print(f"Total messages in history: {len(messages)}")
+        else:
+            print(f"Error: {response.text}")
 
 
 async def test_email_customer():
@@ -83,17 +84,19 @@ async def test_email_customer():
         )
         
         print(f"Status: {response.status_code}")
-        customer_id = response.headers.get("X-Customer-ID")
-        print(f"Customer ID: {customer_id}")
         
-        print("\n📨 Streaming response:")
-        print("-" * 60)
-        for line in response.text.strip().split("\n"):
-            if line:
-                msg = json.loads(line)
-                role_emoji = "👤" if msg["role"] == "user" else "🤖"
-                print(f"{role_emoji} {msg['role']}: {msg['content']}")
-        print("-" * 60)
+        if response.status_code == 200:
+            data = response.json()
+            customer_id = data.get("customer_id")
+            print(f"Customer ID: {customer_id}")
+            
+            print("\n📨 Response:")
+            print("-" * 60)
+            print(f"👤 User: {data['user_message']['content']}")
+            print(f"🤖 AI: {data['ai_response']['content']}")
+            print("-" * 60)
+        else:
+            print(f"Error: {response.text}")
 
 
 async def test_telegram_customer():
@@ -116,17 +119,19 @@ async def test_telegram_customer():
         )
         
         print(f"Status: {response.status_code}")
-        customer_id = response.headers.get("X-Customer-ID")
-        print(f"Customer ID: {customer_id}")
         
-        print("\n📨 Streaming response:")
-        print("-" * 60)
-        for line in response.text.strip().split("\n"):
-            if line:
-                msg = json.loads(line)
-                role_emoji = "👤" if msg["role"] == "user" else "🤖"
-                print(f"{role_emoji} {msg['role']}: {msg['content']}")
-        print("-" * 60)
+        if response.status_code == 200:
+            data = response.json()
+            customer_id = data.get("customer_id")
+            print(f"Customer ID: {customer_id}")
+            
+            print("\n📨 Response:")
+            print("-" * 60)
+            print(f"👤 User: {data['user_message']['content']}")
+            print(f"🤖 AI: {data['ai_response']['content']}")
+            print("-" * 60)
+        else:
+            print(f"Error: {response.text}")
 
 
 async def test_conversation_continuation():
@@ -147,43 +152,47 @@ async def test_conversation_continuation():
                 "customer_name": "Test User",
             },
         )
-        customer_id = response1.headers.get("X-Customer-ID")
-        print(f"Customer ID: {customer_id}")
         
-        # Second message (should have context from first)
-        print("\n2️⃣ Follow-up message (should have conversation context)...")
-        response2 = await client.post(
-            f"{BASE_URL}/api/v1/chat/",
-            json={
-                "prompt": "How long does it take?",  # Context-dependent question
-                "phone_number": "+5555555555",  # Same customer
-                "channel": "whatsapp",
-            },
-        )
-        
-        print("\n📨 AI response (should understand context):")
-        print("-" * 60)
-        for line in response2.text.strip().split("\n"):
-            if line:
-                msg = json.loads(line)
-                if msg["role"] == "model":
-                    print(f"🤖 {msg['content']}")
-        print("-" * 60)
-        
-        # Get full history
-        if customer_id:
-            print(f"\n3️⃣ Full conversation history:")
-            history = await client.get(f"{BASE_URL}/api/v1/chat/{customer_id}")
-            messages = [
-                json.loads(line)
-                for line in history.text.strip().split("\n")
-                if line
-            ]
-            print(f"Total messages: {len(messages)}")
-            for msg in messages:
-                role_emoji = "👤" if msg["role"] == "user" else "🤖"
-                content = msg["content"][:80] + "..." if len(msg["content"]) > 80 else msg["content"]
-                print(f"{role_emoji} {content}")
+        if response1.status_code == 200:
+            data1 = response1.json()
+            customer_id = data1.get("customer_id")
+            print(f"Customer ID: {customer_id}")
+            print(f"🤖 AI: {data1['ai_response']['content'][:100]}...")
+            
+            # Second message (should have context from first)
+            print("\n2️⃣ Follow-up message (should have conversation context)...")
+            response2 = await client.post(
+                f"{BASE_URL}/api/v1/chat/",
+                json={
+                    "prompt": "How long does it take?",  # Context-dependent question
+                    "phone_number": "+5555555555",  # Same customer
+                    "channel": "whatsapp",
+                },
+            )
+            
+            if response2.status_code == 200:
+                data2 = response2.json()
+                print("\n📨 AI response (should understand context):")
+                print("-" * 60)
+                print(f"🤖 {data2['ai_response']['content']}")
+                print("-" * 60)
+            
+            # Get full history
+            if customer_id:
+                print(f"\n3️⃣ Full conversation history:")
+                history = await client.get(f"{BASE_URL}/api/v1/chat/{customer_id}")
+                messages = [
+                    json.loads(line)
+                    for line in history.text.strip().split("\n")
+                    if line
+                ]
+                print(f"Total messages: {len(messages)}")
+                for msg in messages:
+                    role_emoji = "👤" if msg["role"] == "user" else "🤖"
+                    content = msg["content"][:80] + "..." if len(msg["content"]) > 80 else msg["content"]
+                    print(f"{role_emoji} {content}")
+        else:
+            print(f"Error: {response1.text}")
 
 
 async def main():
