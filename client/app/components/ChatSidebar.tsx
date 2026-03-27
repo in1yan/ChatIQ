@@ -1,4 +1,4 @@
-import { Search, Settings, Puzzle } from "lucide-react";
+import { Search, Settings, Puzzle, GitFork } from "lucide-react";
 import { useState } from "react";
 import type React from "react";
 import { Chat, currentUser } from "../data/mockChats";
@@ -20,7 +20,7 @@ export function ChatSidebar({ chats, activeId, onSelect }: ChatSidebarProps) {
   );
 
   return (
-    <aside className="w-80 border-r border-border flex flex-col bg-sidebar h-full shrink-0 animate-[slide-in-left_400ms_cubic-bezier(0.16,1,0.3,1)]">
+    <aside className="w-full border-r border-border flex flex-col bg-sidebar h-full animate-[slide-in-left_400ms_cubic-bezier(0.16,1,0.3,1)]">
       {/* Profile header */}
       <div className="p-4 border-b border-border flex items-center justify-between animate-[fade-in_300ms_cubic-bezier(0.16,1,0.3,1)_100ms_backwards]">
         <div className="flex items-center gap-3">
@@ -53,6 +53,13 @@ export function ChatSidebar({ chats, activeId, onSelect }: ChatSidebarProps) {
           >
             <Settings className="h-4 w-4" />
           </button>
+          <button
+            onClick={() => router.push("/agent")}
+            className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-150 hover:scale-105 active:scale-95"
+            title="agent management"
+          >
+            <GitFork className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
@@ -76,9 +83,15 @@ export function ChatSidebar({ chats, activeId, onSelect }: ChatSidebarProps) {
           <button
             key={chat.id}
             onClick={() => onSelect(chat.id)}
-            style={{ animationDelay: `${Math.min(index * 50, 400)}ms` } as React.CSSProperties}
+            style={
+              {
+                animationDelay: `${Math.min(index * 50, 400)}ms`,
+              } as React.CSSProperties
+            }
             className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all duration-200 hover:bg-notion-hover hover:translate-x-0.5 active:scale-[0.98] animate-[slide-up_300ms_cubic-bezier(0.16,1,0.3,1)_backwards] relative ${
-              activeId === chat.id ? "bg-notion-active before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-primary before:rounded-r" : ""
+              activeId === chat.id
+                ? "bg-notion-active before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-primary before:rounded-r"
+                : ""
             }`}
           >
             <div className="relative shrink-0">
@@ -87,7 +100,11 @@ export function ChatSidebar({ chats, activeId, onSelect }: ChatSidebarProps) {
                 <AvatarFallback>{chat.name[0]}</AvatarFallback>
               </Avatar>
               <div className="absolute -bottom-0.5 -right-0.5">
-                <PlatformIcon platform={chat.platform} size={10} showBackground />
+                <PlatformIcon
+                  platform={chat.platform}
+                  size={10}
+                  showBackground
+                />
               </div>
             </div>
             <div className="flex-1 min-w-0">

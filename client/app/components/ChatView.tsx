@@ -64,7 +64,7 @@ export function ChatView({ chat, onSend }: ChatViewProps) {
                 )}
                 <div>
                   <div
-                    className={`rounded-lg px-3 py-2 text-base leading-normal ${
+                    className={`message-bubble rounded-lg px-3 py-2 leading-normal ${
                       isMe
                         ? "bg-chat-self text-foreground"
                         : "bg-chat-other text-foreground"

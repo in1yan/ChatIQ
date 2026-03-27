@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MessageSquare } from "lucide-react";
 import { chats as initialChats, Chat, Message } from "./data/mockChats";
 import { ChatSidebar } from "./components/ChatSidebar";
@@ -10,6 +10,37 @@ export default function Home() {
   const [activeId, setActiveId] = useState<string | null>(
     initialChats[0]?.id ?? null,
   );
+  const [sidebarWidth, setSidebarWidth] = useState(320); // Default 320px (w-80)
+  const [isResizing, setIsResizing] = useState(false);
+
+  useEffect(() => {
+    const savedWidth = localStorage.getItem('sidebar-width');
+    if (savedWidth) {
+      setSidebarWidth(parseInt(savedWidth, 10));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = Math.min(Math.max(e.clientX, 240), 600); // Min 240px, Max 600px
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      localStorage.setItem('sidebar-width', sidebarWidth.toString());
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, sidebarWidth]);
 
   const activeChat = chats.find((c) => c.id === activeId) ?? null;
 
@@ -27,9 +58,49 @@ export default function Home() {
       ),
     );
   };
+  
   return (
     <div className="flex h-screen w-full overflow-hidden">
-      <ChatSidebar chats={chats} activeId={activeId} onSelect={setActiveId} />
+      <style jsx global>{`
+        /* Prevent text selection during resize */
+        .resizing-sidebar * {
+          user-select: none !important;
+          cursor: col-resize !important;
+        }
+      `}</style>
+      
+      <div 
+        className={`relative shrink-0 ${isResizing ? 'resizing-sidebar' : ''}`}
+        style={{ width: `${sidebarWidth}px` }}
+      >
+        <ChatSidebar chats={chats} activeId={activeId} onSelect={setActiveId} />
+        
+        {/* Resize Handle */}
+        <div
+          onMouseDown={() => setIsResizing(true)}
+          className={`absolute top-0 right-0 bottom-0 w-1 hover:w-1.5 bg-transparent hover:bg-primary/20 cursor-col-resize transition-all duration-150 group z-10 ${
+            isResizing ? 'w-1.5 bg-primary/30' : ''
+          }`}
+          role="separator"
+          aria-label="Resize sidebar"
+          aria-orientation="vertical"
+          aria-valuenow={sidebarWidth}
+          aria-valuemin={240}
+          aria-valuemax={600}
+        >
+          <div className={`absolute inset-y-0 right-0 w-px bg-border transition-opacity duration-150 ${
+            isResizing ? 'opacity-0' : ''
+          }`} />
+          
+          {/* Hover indicator */}
+          <div className="absolute top-1/2 -translate-y-1/2 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+            <div className="flex flex-col gap-1 -mr-0.5">
+              <div className="w-0.5 h-3 bg-primary/60 rounded-full" />
+              <div className="w-0.5 h-3 bg-primary/60 rounded-full" />
+            </div>
+          </div>
+        </div>
+      </div>
       {activeChat ? (
         <ChatView chat={activeChat} onSend={handleSend} />
       ) : (
