@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:5173"
     # AI services
     GROQ_API_KEY: str
+    #Whatsapp services
+    WAHA_BASE_URL: str = "http://localhost:3000/api"
+    WAHA_API_KEY: str
     # supabase config
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""
