@@ -9,9 +9,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sqlalchemy import select, desc
+from app.models import Customer, Message
 from app.db.session import get_db
-from app.dependancies.auth import get_current_user
 from app.schemas.chat import (
+    AdminReplyRequest,
     ChatMessage,
     ChatRequest,
     ChatResponse,
@@ -19,13 +21,15 @@ from app.schemas.chat import (
     SendMessageRequest,
     SendMessageResponse,
 )
+from app.dependancies.auth import get_current_user
 from app.services.agent.main import (
     get_chat_response,
-    get_customer_messages,
     get_or_create_customer,
+    save_manual_agent_message,
     send_direct_message,
-    to_chat_message,
 )
+from app.services.telegram.webhook import send_telegram_message
+from app.services.whatsapp.whatsapp import send_whatsapp_message
 
 router = APIRouter()
 
@@ -89,33 +93,124 @@ async def get_chat_history(
     customer_id: int,
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """
-    Retrieve all chat messages for a specific customer.
-
-    Args:
-        customer_id: Customer ID
-        db: Database session
-
-    Returns:
-        Newline-delimited JSON chat messages
-    """
-    # Get all messages for the customer
-    messages = await get_customer_messages(db, customer_id)
-
-    # Convert to chat message format
+    limit_query = select(Message.message_data).where(Message.customer_id == customer_id).order_by(Message.id)
+    result = await db.execute(limit_query)
+    rows = result.scalars().all()
+    
     chat_messages = []
-    for msg in messages:
-        try:
-            chat_messages.append(to_chat_message(msg))
-        except Exception:
-            # Skip messages that can't be converted
+    for message_data_list in rows:
+        if not isinstance(message_data_list, list):
             continue
+        for msg in message_data_list:
+            role = "unknown"
+            content = ""
+            timestamp = msg.get("timestamp", "")
+            
+            m_type = msg.get("type", msg.get("kind"))
+            parts = msg.get("parts", [])
+            
+            if m_type == "request":
+                role = "user"
+                for p in parts:
+                    pk = p.get("part_kind", p.get("type"))
+                    if pk in ("user-prompt", "text", "user"):
+                        content += p.get("content", "")
+            elif m_type in ("model-response", "response"):
+                role = "model"
+                for p in parts:
+                    pk = p.get("part_kind", p.get("type"))
+                    if pk in ("text", "model"):
+                        content += p.get("content", "")
+            
+            if role != "unknown" and content:
+                chat_messages.append({"role": role, "timestamp": timestamp, "content": content})
 
-    # Return as newline-delimited JSON
     return Response(
         b"\n".join(json.dumps(m).encode("utf-8") for m in chat_messages),
         media_type="text/plain",
     )
+
+
+@router.get(
+    "/customers/all",
+    status_code=status.HTTP_200_OK,
+    summary="Get all customers",
+    response_model=list[CustomerResponse],
+)
+async def list_customers(db: AsyncSession = Depends(get_db)):
+    """Fetch all customers from the DB for the CRM sidebar."""
+    query = select(Customer).order_by(desc(Customer.updated_at))
+    result = await db.execute(query)
+    customers = result.scalars().all()
+    # Ensure ai_paused doesn't crash if null temporarily
+    for c in customers:
+        if c.ai_paused is None:
+            c.ai_paused = False
+    return customers
+
+
+@router.post(
+    "/{customer_id}/toggle-ai",
+    status_code=status.HTTP_200_OK,
+    summary="Toggle AI auto-reply",
+)
+async def toggle_ai(
+    customer_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Enable or disable the AI proxy for a specific customer."""
+    customer = await db.get(Customer, customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+        
+    customer.ai_paused = not customer.ai_paused
+    await db.commit()
+    return {"status": "success", "ai_paused": customer.ai_paused}
+
+
+@router.post(
+    "/{customer_id}/reply",
+    status_code=status.HTTP_200_OK,
+    summary="Human agent reply",
+)
+async def agent_reply(
+    customer_id: int,
+    request: AdminReplyRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Dispatch a response to the customer via their channel directly from the CRM UI."""
+    customer = await db.get(Customer, customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    # Send the physical outbound request via channel API
+    channel_status = "sent"
+    if customer.channel == "whatsapp" and customer.phone_number:
+        # Check if chat_id exists in extra_data, or format from phone number
+        chat_id = customer.extra_data.get("chat_id") if isinstance(customer.extra_data, dict) else None
+        if not chat_id:
+            raw_num = customer.phone_number.replace("+", "")
+            chat_id = f"{raw_num}@c.us"
+        try:
+            await send_whatsapp_message(chat_id, request.message)
+        except Exception as e:
+            channel_status = f"error: {str(e)}"
+    elif customer.channel == "telegram" and customer.telegram_user_id:
+        try:
+            await send_telegram_message(customer.telegram_user_id, request.message)
+        except Exception as e:
+            channel_status = f"error: {str(e)}"
+    else:
+        channel_status = "skipped_or_channel_not_supported"
+
+    # Append the manual message to our internal history
+    await save_manual_agent_message(db, customer_id, request.message)
+    
+    # Touch the customer updated_at timestamp so they sort to the top
+    customer.ai_paused = True # Implicitly pause the AI if human takes over
+    await db.commit()
+
+    return {"status": "success", "ai_paused": True, "delivery": channel_status}
 
 
 @router.post(
@@ -160,6 +255,13 @@ async def send_message_to_customer(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Customer's channel ({response_data['channel']}) does not match requested channel ({request.channel})",
             )
+            
+        # Optional: Save it locally so the CRM sees the API's messages too
+        customer = await db.get(Customer, request.customer_id)
+        if customer:
+            await save_manual_agent_message(db, request.customer_id, request.message)
+            customer.ai_paused = True
+            await db.commit()
 
         return SendMessageResponse(**response_data)
 

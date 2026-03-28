@@ -15,6 +15,7 @@ from pydantic_ai import (
     ModelMessagesTypeAdapter,
     ModelRequest,
     ModelResponse,
+    RunContext,
     TextPart,
     UnexpectedModelBehavior,
     UserPromptPart,
@@ -46,8 +47,10 @@ def get_agent() -> Agent:
             "You will hold full conversation with customers convincing them to buy products or resolve issues. "
             "Always generate response in plain text don't use markdown. "
             "IMPORTANT: Use the 'search_knowledge_base' tool whenever a customer asks for specific information "
-            "that you don't know"
-            "Do NOT make up information. If the information is not in the knowledge base, say so."
+            "that you don't know, such as product details, discount codes, or company policies. "
+            "Do NOT make up information. If the information is not in the knowledge base, say so. "
+            "During the conversation, immediately use 'log_message_insight' when you detect upsell opportunities, service gaps, or strong sentiments. "
+            "At the end of the conversation, use 'log_conversation_insight' to summarize the overall metrics like churn risk, customer segments, trending topics, and aspect based sentiments."
         )
         
         _agent = Agent(model=gm, system_prompt=system_prompt)
@@ -85,6 +88,70 @@ def get_agent() -> Agent:
                 return f"Relevant information from knowledge base:\n\n{context}"
             except Exception as e:
                 return f"Error searching knowledge base: {str(e)}"
+
+        @_agent.tool
+        async def log_message_insight(
+            ctx: RunContext[dict],
+            per_message_sentiment: str,
+            upsell_opportunity: str | None = None,
+            service_gap: str | None = None
+        ) -> str:
+            """
+            Log insights for the current message or recent exchange.
+            Call this DURING the conversation when you detect sentiments, upsell opportunities, or service gaps.
+            """
+            from app.models.insights import Insight
+            
+            db = ctx.deps["db"]
+            customer_id = ctx.deps["customer_id"]
+            
+            insight = Insight(
+                customer_id=customer_id,
+                insight_type="message_level",
+                per_message_sentiment=per_message_sentiment,
+                upsell_opportunity=upsell_opportunity,
+                service_gap=service_gap
+            )
+            db.add(insight)
+            await db.commit()
+            return "Message insight logged successfully."
+
+        @_agent.tool
+        async def log_conversation_insight(
+            ctx: RunContext[dict],
+            conversation_sentiment: str,
+            channel_sentiment_trend: str,
+            churn_risk: str,
+            customer_segment_lead_score: str,
+            aspect_based_sentiment: dict,
+            trending_topics: list[str],
+            traffic_rate: str | None = None,
+            traffic_to_conversion_rate: str | None = None
+        ) -> str:
+            """
+            Log insights for the entire conversation.
+            Call this at the END of the conversation to provide overall metrics.
+            """
+            from app.models.insights import Insight
+            
+            db = ctx.deps["db"]
+            customer_id = ctx.deps["customer_id"]
+            
+            insight = Insight(
+                customer_id=customer_id,
+                insight_type="conversation_level",
+                conversation_sentiment=conversation_sentiment,
+                channel_sentiment_trend=channel_sentiment_trend,
+                churn_risk=churn_risk,
+                customer_segment_lead_score=customer_segment_lead_score,
+                aspect_based_sentiment=aspect_based_sentiment,
+                trending_topics=trending_topics,
+                traffic_rate=traffic_rate,
+                traffic_to_conversion_rate=traffic_to_conversion_rate
+            )
+            db.add(insight)
+            await db.commit()
+            return "Conversation insight logged successfully."
 
     return _agent
 
@@ -237,21 +304,30 @@ async def get_customer_messages(
     return messages
 
 
+from sqlalchemy import update
+from sqlalchemy.sql import func
+
 async def save_messages(db: AsyncSession, customer_id: int, messages: bytes) -> None:
     """
-    Save new messages for a customer.
-
-    Args:
-        db: Database session
-        customer_id: Customer ID
-        messages: JSON bytes containing Pydantic AI message data
+    Save new messages for a customer and bump their updated_at timestamp.
     """
     message = Message(
         customer_id=customer_id,
         message_data=json.loads(messages),  # Store as dict for JSONB
     )
     db.add(message)
+    await db.execute(update(Customer).where(Customer.id == customer_id).values(updated_at=func.now()))
     await db.commit()
+
+async def save_manual_user_message(db: AsyncSession, customer_id: int, content: str) -> None:
+    m = ModelRequest(parts=[UserPromptPart(content=content, timestamp=datetime.now(timezone.utc))])
+    msg_data = ModelMessagesTypeAdapter.dump_json([m])
+    await save_messages(db, customer_id, msg_data)
+
+async def save_manual_agent_message(db: AsyncSession, customer_id: int, content: str) -> None:
+    m = ModelResponse(parts=[TextPart(content=f"[AGENT] {content}")], timestamp=datetime.now(timezone.utc))
+    msg_data = ModelMessagesTypeAdapter.dump_json([m])
+    await save_messages(db, customer_id, msg_data)
 
 
 async def get_chat_response(prompt: str, customer_id: int, db: AsyncSession) -> dict:
@@ -273,7 +349,8 @@ async def get_chat_response(prompt: str, customer_id: int, db: AsyncSession) -> 
     agent = get_agent()
 
     # Run the agent and wait for complete response
-    result = await agent.run(prompt, message_history=messages)
+    deps = {"db": db, "customer_id": customer_id}
+    result = await agent.run(prompt, message_history=messages, deps=deps)
 
     # Save new messages to database
     await save_messages(db, customer_id, result.new_messages_json())
@@ -327,7 +404,8 @@ async def stream_chat_response(
     agent = get_agent()
 
     # Run the agent with user prompt and chat history
-    async with agent.run_stream(prompt, message_history=messages) as result:
+    deps = {"db": db, "customer_id": customer_id}
+    async with agent.run_stream(prompt, message_history=messages, deps=deps) as result:
         async for text in result.stream_output(debounce_by=0.01):
             # text is a str, convert to ChatMessage format
             m = ModelResponse(parts=[TextPart(text)], timestamp=result.timestamp())

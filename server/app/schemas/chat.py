@@ -35,10 +35,15 @@ class ChatRequest(BaseModel):
 
 
 class ChatMessage(BaseModel):
-    role: Literal["user", "model"]
+    role: Literal["user", "model", "agent"]
     timestamp: str
     content: str
 
+class AdminReplyRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+
+
+from datetime import datetime
 
 class CustomerResponse(BaseModel):
     id: int
@@ -47,7 +52,9 @@ class CustomerResponse(BaseModel):
     telegram_username: Optional[str]
     channel: str
     full_name: Optional[str]
-    created_at: str
+    profile_picture_url: Optional[str]
+    ai_paused: bool = False
+    created_at: datetime
 
 
 class ChatResponse(BaseModel):
