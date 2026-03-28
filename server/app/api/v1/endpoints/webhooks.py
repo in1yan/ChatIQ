@@ -60,7 +60,10 @@ async def whatsapp_webhook(request: Request, db: AsyncSession = Depends(get_db))
         print(payload)
         # Extract message details
         chat_id = payload.get("from")
-        full_name = payload.get("notifyName")
+        print(chat_id)
+        print(payload.get("_data"))
+        print(payload.get("_data").get("notifyName") if payload.get("_data") else None)
+        full_name = payload.get("_data").get("notifyName") if payload.get("_data") else None
         message_text = payload.get("body")
         message_id = payload.get("id")
 
