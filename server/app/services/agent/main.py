@@ -40,7 +40,54 @@ def get_agent() -> Agent:
         # Initialize the AI agent with OpenAI GPT-5.2
         # Make sure OPENAI_API_KEY is set in environment
         gm = GroqModel(model, provider=GroqProvider(api_key=settings.GROQ_API_KEY))
-        _agent = Agent(model=gm, system_prompt="You are a helpful customer support assistant. You will hold full on converstion with customers convincing them to buy products or reolve issue. Always generate response in plain text don't use markdown.")
+        
+        system_prompt = (
+            "You are a helpful customer support assistant for ChatIQ. "
+            "You will hold full conversation with customers convincing them to buy products or resolve issues. "
+            "Always generate response in plain text don't use markdown. "
+            "IMPORTANT: Use the 'search_knowledge_base' tool whenever a customer asks for specific information "
+            "that you don't know, such as product details, discount codes, or company policies. "
+            "Do NOT make up information. If the information is not in the knowledge base, say so."
+        )
+        
+        _agent = Agent(model=gm, system_prompt=system_prompt)
+
+        @_agent.tool_plain
+        async def search_knowledge_base(query: str) -> str:
+            """
+            Search the internal knowledge base for details about products, services, or company policies.
+            Use this tool when a customer asks a specific question that requires company-specific knowledge.
+            
+            Args:
+                query: The search terms or question to look up.
+            """
+            from app.services.chroma.service import get_chroma_service
+            
+            try:
+                chroma_service = get_chroma_service()
+                results = chroma_service.search_documents(query)
+                
+                # documents is a list of lists: [[doc1, doc2, ...]]
+                documents = results.get("documents", [])
+                if not documents or not documents[0]:
+                    return "No relevant information found in the knowledge base."
+                
+                # Flatten the list of documents
+                flat_docs = []
+                for doc_list in documents:
+                    for doc in doc_list:
+                        if doc and doc.strip():
+                            flat_docs.append(doc)
+                
+                if not flat_docs:
+                    return "No relevant information found in the knowledge base."
+                
+                # Combine top result snippets
+                context = "\n---\n".join(flat_docs[:5])
+                return f"Relevant information from knowledge base:\n\n{context}"
+            except Exception as e:
+                return f"Error searching knowledge base: {str(e)}"
+
     return _agent
 
 
