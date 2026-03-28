@@ -1,14 +1,23 @@
-# services/telegram/__init__.py
+"""
+Telegram service module for webhook-based integration.
+"""
 
-from .bot_logic import dp
-from .api_client import bot, send_notification
-from .agent_manager import get_agent_response
+from .webhook import (
+    bot,
+    delete_webhook,
+    get_telegram_profile_picture,
+    get_webhook_info,
+    send_telegram_message,
+    send_typing_action,
+    set_webhook,
+)
 
-# The __all__ list defines what is exported when someone 
-# writes "from services.telegram import *"
 __all__ = [
-    "dp", 
-    "bot", 
-    "send_notification", 
-    "get_agent_response"
+    "bot",
+    "get_telegram_profile_picture",
+    "send_telegram_message",
+    "send_typing_action",
+    "set_webhook",
+    "delete_webhook",
+    "get_webhook_info",
 ]

@@ -19,9 +19,13 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:5173"
     # AI services
     GROQ_API_KEY: str
-    #Whatsapp services
+    # Whatsapp services
     WAHA_BASE_URL: str = "http://localhost:3000/api"
     WAHA_API_KEY: str
+    # Telegram Bot
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_WEBHOOK_URL: str = ""
+    TELEGRAM_WEBHOOK_SECRET: str = ""
     # supabase config
     SUPABASE_URL: str = ""
     SUPABASE_KEY: str = ""

@@ -20,6 +20,9 @@ class Customer(Base):
         String(255), unique=True, index=True, nullable=True
     )
     telegram_username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    telegram_user_id: Mapped[Optional[str]] = mapped_column(
+        String(50), unique=True, index=True, nullable=True
+    )
     channel: Mapped[str] = mapped_column(
         String(20), nullable=False
     )  # 'whatsapp', 'telegram', 'email'
@@ -37,7 +40,7 @@ class Customer(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "phone_number IS NOT NULL OR email IS NOT NULL",
+            "phone_number IS NOT NULL OR email IS NOT NULL OR telegram_user_id IS NOT NULL",
             name="check_identifier",
         ),
     )

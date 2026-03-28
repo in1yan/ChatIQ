@@ -1,14 +1,17 @@
+import asyncio
+
 from aiogram import Dispatcher, types
 from aiogram.filters import CommandStart
-from agent_manager import get_agent_response
 from api_client import bot
-import asyncio
+
 dp = Dispatcher()
+
 
 @dp.message(CommandStart)
 async def command_start_handler(message: types.Message):
     await message.answer("Hi!. How can I help your business today?")
     print("success")
+
 
 @dp.message()
 async def echo_handler(message: types.Message) -> None:
@@ -23,15 +26,16 @@ async def echo_handler(message: types.Message) -> None:
         # Later, replace 'AI Reply' with: await get_agent_response(message.chat.id, message.text)
         customer_msg = message.text
         ai_reply = "Hello! I am your AI Business Assistant. How can I help?"
-        
+
         full_response = f"📝 You said: {customer_msg}\n\n🤖 Agent: {ai_reply}"
 
         # 3. Send back to the sender
         await message.answer(full_response)
-        
+
     except Exception as e:
         print(f"Error sending reply: {e}")
-            
+
+
 async def main() -> None:
     # Initialize Bot instance with default bot properties which will be passed to all API calls
     # bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))

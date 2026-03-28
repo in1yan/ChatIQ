@@ -79,19 +79,21 @@ def to_chat_message(m: ModelMessage) -> ChatMessage:
 
 async def get_or_create_customer(
     db: AsyncSession,
-    phone: str | None,
-    email: str | None,
-    channel: str,
+    phone: str | None = None,
+    email: str | None = None,
+    telegram_user_id: str | None = None,
+    channel: str = "",
     chat_id: str | None = None,
     **metadata,
 ) -> Customer:
     """
-    Get existing customer or create a new one based on phone/email identifier.
+    Get existing customer or create a new one based on identifier.
 
     Args:
         db: Database session
         phone: Customer phone number (for WhatsApp/Telegram)
         email: Customer email (for email channel)
+        telegram_user_id: Telegram user ID (for Telegram channel)
         channel: Communication channel (whatsapp, telegram, email)
         chat_id: WhatsApp chat ID (for profile picture fetching)
         **metadata: Additional customer data (full_name, telegram_username, etc.)
@@ -99,14 +101,18 @@ async def get_or_create_customer(
     Returns:
         Customer object (existing or newly created)
     """
-    # Find existing customer
+    # Find existing customer based on available identifier
     query = select(Customer)
-    if phone:
+    if telegram_user_id:
+        query = query.where(Customer.telegram_user_id == telegram_user_id)
+    elif phone:
         query = query.where(Customer.phone_number == phone)
     elif email:
         query = query.where(Customer.email == email)
     else:
-        raise ValueError("Either phone_number or email must be provided")
+        raise ValueError(
+            "At least one identifier must be provided: phone, email, or telegram_user_id"
+        )
 
     result = await db.execute(query)
     existing_customer = result.scalar_one_or_none()
@@ -120,17 +126,28 @@ async def get_or_create_customer(
             await db.refresh(existing_customer)
         return existing_customer
 
-    # Fetch profile picture for WhatsApp customers (only on creation)
+    # Fetch profile picture based on channel (only on creation)
     profile_picture_url = None
+
     if channel == "whatsapp" and chat_id:
         from app.services.whatsapp.whatsapp import get_profile_picture
 
         profile_picture_url = await get_profile_picture(chat_id)
 
+    elif channel == "telegram" and telegram_user_id:
+        from app.services.telegram.webhook import get_telegram_profile_picture
+
+        try:
+            user_id_int = int(telegram_user_id)
+            profile_picture_url = await get_telegram_profile_picture(user_id_int)
+        except ValueError:
+            pass  # Invalid telegram_user_id, skip profile picture
+
     # Create new customer
     customer = Customer(
         phone_number=phone,
         email=email,
+        telegram_user_id=telegram_user_id,
         channel=channel,
         full_name=metadata.get("full_name"),
         telegram_username=metadata.get("telegram_username"),
