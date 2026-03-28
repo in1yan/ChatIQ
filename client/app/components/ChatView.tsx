@@ -33,10 +33,6 @@ export function ChatView({ chat, onSend, onToggleAi }: ChatViewProps) {
             <p className="text-sm font-semibold text-foreground leading-tight">
               {chat.name}
             </p>
-            <p className="text-xs mt-1 flex items-center gap-1.5 leading-tight">
-              <span className="w-1.5 h-1.5 rounded-full bg-online"></span>
-              <span className="text-online font-medium">Online</span>
-            </p>
           </div>
         </div>
 

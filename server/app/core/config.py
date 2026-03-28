@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     ALLOWED_HOSTS: List[str] = ["*"]
-    FRONTEND_URL: str = "http://localhost:5173"
+    FRONTEND_URL: str = "http://localhost:3000"
     # AI services
     GROQ_API_KEY: str
     # ChromaDB vector store

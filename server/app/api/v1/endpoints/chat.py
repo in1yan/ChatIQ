@@ -189,8 +189,8 @@ async def agent_reply(
         # Check if chat_id exists in extra_data, or format from phone number
         chat_id = customer.extra_data.get("chat_id") if isinstance(customer.extra_data, dict) else None
         if not chat_id:
-            raw_num = customer.phone_number.replace("+", "")
-            chat_id = f"{raw_num}@c.us"
+            raw_num = customer.phone_number.replace("+", "").replace(" ", "").replace("-", "")
+            chat_id = f"{raw_num}@lid"
         try:
             await send_whatsapp_message(chat_id, request.message)
         except Exception as e:
@@ -223,7 +223,7 @@ async def agent_reply(
 async def send_message_to_customer(
     request: SendMessageRequest,
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(get_current_user),
+    # current_user = Depends(get_current_user),
 ) -> SendMessageResponse:
     """
     Send a direct message to a customer via their preferred channel.

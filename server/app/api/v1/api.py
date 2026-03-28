@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, chat, health, insights, knowledge, webhooks
+from app.api.v1.endpoints import agent, auth, chat, health, insights, knowledge, webhooks
 
 api_router = APIRouter()
 
@@ -37,4 +37,10 @@ api_router.include_router(
     insights.router,
     prefix="/insights",
     tags=["insights"],
+)
+
+api_router.include_router(
+    agent.router,
+    prefix="/agent",
+    tags=["agent"],
 )
