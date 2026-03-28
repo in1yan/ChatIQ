@@ -10,6 +10,43 @@ WAHA_BASE_URL = settings.WAHA_BASE_URL
 API_KEY = settings.WAHA_API_KEY
 
 
+async def get_profile_picture(chat_id: str, session: str = "default") -> str | None:
+    """
+    Fetch WhatsApp profile picture URL from WAHA API.
+
+    Args:
+        chat_id: WhatsApp chat ID (format: "1234567890@c.us")
+        session: WAHA session name (default: "default")
+
+    Returns:
+        Profile picture URL or None if unavailable/error
+    """
+    try:
+        # URL encode the chat_id for the API request
+        import urllib.parse
+        encoded_chat_id = urllib.parse.quote(chat_id, safe='')
+        
+        url = f"{WAHA_BASE_URL}/{session}/chats/{encoded_chat_id}/picture?refresh=true"
+
+        headers = {
+            "accept": "application/json",
+            "X-Api-Key": API_KEY,
+        }
+
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            return data.get("url")
+
+    except httpx.HTTPError as e:
+        print(f"Error fetching profile picture for {chat_id}: {e}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error fetching profile picture: {e}")
+        return None
+
+
 async def send_whatsapp_message(chat_id: str, message: str, session: str = "default"):
     """
     Send a text message via WhatsApp.

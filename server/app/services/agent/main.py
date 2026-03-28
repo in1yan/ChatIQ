@@ -82,6 +82,7 @@ async def get_or_create_customer(
     phone: str | None,
     email: str | None,
     channel: str,
+    chat_id: str | None = None,
     **metadata,
 ) -> Customer:
     """
@@ -92,6 +93,7 @@ async def get_or_create_customer(
         phone: Customer phone number (for WhatsApp/Telegram)
         email: Customer email (for email channel)
         channel: Communication channel (whatsapp, telegram, email)
+        chat_id: WhatsApp chat ID (for profile picture fetching)
         **metadata: Additional customer data (full_name, telegram_username, etc.)
 
     Returns:
@@ -112,6 +114,13 @@ async def get_or_create_customer(
     if existing_customer:
         return existing_customer
 
+    # Fetch profile picture for WhatsApp customers (only on creation)
+    profile_picture_url = None
+    if channel == "whatsapp" and chat_id:
+        from app.services.whatsapp.whatsapp import get_profile_picture
+
+        profile_picture_url = await get_profile_picture(chat_id)
+
     # Create new customer
     customer = Customer(
         phone_number=phone,
@@ -119,6 +128,7 @@ async def get_or_create_customer(
         channel=channel,
         full_name=metadata.get("full_name"),
         telegram_username=metadata.get("telegram_username"),
+        profile_picture_url=profile_picture_url,
         extra_data=metadata,
     )
 
