@@ -12,11 +12,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from app.models import Customer, Message
 from app.db.session import get_db
-from app.schemas.chat import AdminReplyRequest, ChatMessage, ChatRequest, ChatResponse, CustomerResponse
+from app.schemas.chat import (
+    AdminReplyRequest,
+    ChatMessage,
+    ChatRequest,
+    ChatResponse,
+    CustomerResponse,
+    SendMessageRequest,
+    SendMessageResponse,
+)
+from app.dependancies.auth import get_current_user
 from app.services.agent.main import (
     get_chat_response,
     get_or_create_customer,
     save_manual_agent_message,
+    send_direct_message,
 )
 from app.services.telegram.webhook import send_telegram_message
 from app.services.whatsapp.whatsapp import send_whatsapp_message
@@ -201,3 +211,69 @@ async def agent_reply(
     await db.commit()
 
     return {"status": "success", "ai_paused": True, "delivery": channel_status}
+
+
+@router.post(
+    "/send",
+    status_code=status.HTTP_200_OK,
+    summary="Send direct message to customer",
+    response_description="Message delivery confirmation",
+    response_model=SendMessageResponse,
+)
+async def send_message_to_customer(
+    request: SendMessageRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user),
+) -> SendMessageResponse:
+    """
+    Send a direct message to a customer via their preferred channel.
+
+    This endpoint allows authenticated users to send human-written messages
+    directly to customers via WhatsApp or Telegram. Messages do NOT go through
+    the AI agent - they are sent as-is to the customer.
+
+    Args:
+        request: Send message request with customer_id, message, and channel
+        db: Database session
+        current_user: Authenticated user (required)
+
+    Returns:
+        Message delivery confirmation with message ID and timestamp
+
+    Raises:
+        400: Bad request (customer not found, channel not supported, etc.)
+        401: Unauthorized (no valid authentication token)
+        500: Failed to send message
+    """
+    try:
+        # Call the service to send the message
+        response_data = await send_direct_message(db, request.customer_id, request.message)
+
+        # Verify the channel matches the request
+        if response_data["channel"] != request.channel:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Customer's channel ({response_data['channel']}) does not match requested channel ({request.channel})",
+            )
+            
+        # Optional: Save it locally so the CRM sees the API's messages too
+        customer = await db.get(Customer, request.customer_id)
+        if customer:
+            await save_manual_agent_message(db, request.customer_id, request.message)
+            customer.ai_paused = True
+            await db.commit()
+
+        return SendMessageResponse(**response_data)
+
+    except ValueError as e:
+        # Validation errors from service layer
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        # Unexpected errors
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send message: {str(e)}",
+        )
