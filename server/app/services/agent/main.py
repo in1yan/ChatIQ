@@ -290,3 +290,106 @@ async def stream_chat_response(
 
     # Save new messages to database
     await save_messages(db, customer_id, result.new_messages_json())
+
+
+async def send_direct_message(
+    db: AsyncSession, customer_id: int, message: str
+) -> dict:
+    """
+    Send a direct message to a customer via their preferred channel.
+
+    This is for human-written messages, not AI-generated responses.
+    Does NOT require chat history or AI processing.
+
+    Args:
+        db: Database session
+        customer_id: Customer ID to send message to
+        message: Message text to send
+
+    Returns:
+        Dictionary with message delivery metadata:
+        {
+            "success": bool,
+            "message_id": str or None,
+            "timestamp": str (ISO format),
+            "channel": str,
+            "customer_id": int
+        }
+
+    Raises:
+        ValueError: If customer not found or channel not supported
+    """
+    # Get the customer
+    result = await db.execute(select(Customer).where(Customer.id == customer_id))
+    customer = result.scalar_one_or_none()
+
+    if not customer:
+        raise ValueError(f"Customer with ID {customer_id} not found")
+
+    channel = customer.channel
+    timestamp = datetime.now(tz=timezone.utc).isoformat()
+
+    try:
+        if channel == "whatsapp":
+            # Send via WhatsApp
+            from app.services.whatsapp.whatsapp import send_whatsapp_message
+
+            # For WhatsApp, we need the chat_id format (phone@c.us)
+            # Try to construct it from phone_number
+            if not customer.phone_number:
+                raise ValueError(
+                    f"Customer {customer_id} has no phone number for WhatsApp"
+                )
+
+            # Normalize phone number to WhatsApp format (phone@c.us)
+            phone = customer.phone_number.replace("+", "").replace(" ", "").replace("-", "")
+            chat_id = f"{phone}@c.us"
+
+            response = await send_whatsapp_message(chat_id, message)
+
+            # Extract message ID from WAHA API response
+            # Handle different response formats
+            message_id = None
+            if isinstance(response, dict):
+                # Try common locations for message ID in WAHA response
+                message_id = response.get("message", {}).get("id") or response.get("id")
+
+            return {
+                "success": True,
+                "message_id": message_id,
+                "timestamp": timestamp,
+                "channel": "whatsapp",
+                "customer_id": customer_id,
+            }
+
+        elif channel == "telegram":
+            # Send via Telegram
+            from app.services.telegram.webhook import send_telegram_message
+
+            if not customer.telegram_user_id:
+                raise ValueError(
+                    f"Customer {customer_id} has no telegram_user_id for Telegram"
+                )
+
+            try:
+                chat_id = int(customer.telegram_user_id)
+            except (ValueError, TypeError):
+                raise ValueError(
+                    f"Invalid telegram_user_id for customer {customer_id}: {customer.telegram_user_id}"
+                )
+
+            response = await send_telegram_message(chat_id, message)
+
+            return {
+                "success": True,
+                "message_id": str(response.get("message_id")) if response.get("message_id") else None,
+                "timestamp": response.get("date", timestamp),
+                "channel": "telegram",
+                "customer_id": customer_id,
+            }
+
+        else:
+            raise ValueError(f"Unsupported channel: {channel}")
+
+    except Exception as e:
+        raise ValueError(f"Failed to send message via {channel}: {str(e)}")
