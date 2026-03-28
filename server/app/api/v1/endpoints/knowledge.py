@@ -11,6 +11,8 @@ from app.schemas.knowledge import (
     KnowledgeDocument,
     KnowledgeIngestResponse,
     KnowledgeListResponse,
+    KnowledgeSearchResponse,
+    SearchResult,
 )
 from app.services.chroma.service import ChromaVectorService, get_chroma_service
 
@@ -25,12 +27,11 @@ router = APIRouter()
 )
 async def ingest_document(
     file: UploadFile,
-    namespace: str = Query(..., description="Namespace to categorize the document"),
     chroma_service: ChromaVectorService = Depends(get_chroma_service),
 ) -> KnowledgeIngestResponse:
     """
     Ingest a PDF or text file into the vector database.
-    The file will be chunked and stored with the specified namespace.
+    The file will be chunked and stored in the knowledge base.
     """
     # Create a temporary file to store the uploaded content
     suffix = os.path.splitext(file.filename)[1].lower()
@@ -47,19 +48,10 @@ async def ingest_document(
 
         try:
             # Ingest the file using Chroma service
-            chunks_count = chroma_service.ingest_file(
-                file_path=tmp_path,
-                namespace=namespace,
-            )
-            
-            # Note: Chroma Service uses the file's base name from the path.
-            # However, since we used a temporary file, we might want to override the filename in metadata if possible.
-            # But currently ingest_file uses path.name. Let's fix this in the service or here.
-            # For now, we'll inform the user about the filename.
+            chunks_count = chroma_service.ingest_file(file_path=tmp_path)
             
             return KnowledgeIngestResponse(
                 file_name=file.filename,
-                namespace=namespace,
                 chunks_count=chunks_count,
                 message=f"Successfully ingested {file.filename} with {chunks_count} chunks.",
             )
@@ -80,13 +72,59 @@ async def ingest_document(
     summary="List documents in the knowledge base",
 )
 async def list_documents(
-    namespace: Optional[str] = Query(None, description="Filter documents by namespace"),
     chroma_service: ChromaVectorService = Depends(get_chroma_service),
 ) -> KnowledgeListResponse:
     """Retrieve a list of unique documents stored in the knowledge base."""
-    docs_metadata = chroma_service.list_documents(namespace=namespace)
+    docs_metadata = chroma_service.list_documents()
     documents = [KnowledgeDocument(**doc) for doc in docs_metadata]
     return KnowledgeListResponse(documents=documents)
+
+
+@router.get(
+    "/search",
+    response_model=KnowledgeSearchResponse,
+    summary="Search the knowledge base",
+)
+async def search_knowledge(
+    query: str = Query(..., description="Search query text", min_length=1),
+    n_results: int = Query(5, description="Maximum number of results to return", ge=1, le=50),
+    chroma_service: ChromaVectorService = Depends(get_chroma_service),
+) -> KnowledgeSearchResponse:
+    """
+    Search the knowledge base for relevant document chunks.
+    Returns the most similar chunks based on semantic similarity.
+    """
+    try:
+        search_results = chroma_service.search_documents(query_text=query, n_results=n_results)
+        
+        results: List[SearchResult] = []
+        documents = search_results.get("documents", [])
+        metadatas = search_results.get("metadatas", [])
+        
+        if documents and len(documents) > 0:
+            for doc_list, metadata_list in zip(documents, metadatas):
+                for doc, metadata in zip(doc_list, metadata_list):
+                    if doc and doc.strip():
+                        results.append(
+                            SearchResult(
+                                content=doc,
+                                file_name=metadata.get("file_name", "unknown"),
+                                file_type=metadata.get("file_type"),
+                                file_path=metadata.get("file_path"),
+                                chunk_index=metadata.get("chunk_index"),
+                            )
+                        )
+        
+        return KnowledgeSearchResponse(
+            query=query,
+            results=results,
+            count=len(results),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error searching knowledge base: {str(e)}",
+        )
 
 
 @router.delete(
@@ -95,21 +133,22 @@ async def list_documents(
     summary="Delete documents from the knowledge base",
 )
 async def delete_documents(
-    namespace: str = Query(..., description="Namespace of the documents to delete"),
-    file_name: Optional[str] = Query(None, description="Specific file name to delete within the namespace"),
+    file_name: Optional[str] = Query(None, description="File name to delete"),
     chroma_service: ChromaVectorService = Depends(get_chroma_service),
 ) -> KnowledgeDeleteResponse:
     """
-    Delete all chunks associated with a namespace, or a specific file within a namespace.
+    Delete documents from the knowledge base.
+    If file_name is provided, only that file will be deleted.
+    If no file_name is provided, all documents will be deleted.
     """
     try:
-        chroma_service.delete_documents(namespace=namespace, file_name=file_name)
-        msg = f"Successfully deleted documents in namespace '{namespace}'"
+        chroma_service.delete_documents(file_name=file_name)
         if file_name:
-            msg += f" with file name '{file_name}'"
+            msg = f"Successfully deleted documents with file name '{file_name}'"
+        else:
+            msg = "Successfully deleted all documents"
         
         return KnowledgeDeleteResponse(
-            namespace=namespace,
             file_name=file_name,
             message=msg,
         )

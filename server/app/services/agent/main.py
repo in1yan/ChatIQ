@@ -55,12 +55,25 @@ def get_agent() -> Agent:
         
         _agent = Agent(model=gm, system_prompt=system_prompt)
 
+        @_agent.system_prompt
+        async def add_custom_instructions(ctx: RunContext[dict]) -> str:
+            """Append custom instructions from the database."""
+            db = ctx.deps["db"]
+            from sqlalchemy import select
+            from app.models.agent_configs import AgentConfig
+            
+            result = await db.execute(select(AgentConfig).order_by(AgentConfig.id.desc()).limit(1))
+            config = result.scalar_one_or_none()
+            
+            if config and config.custom_instructions:
+                instructions_text = "\n".join(f"- {inst}" for inst in config.custom_instructions)
+                return f"### Additional Custom Instructions ###\n{instructions_text}\n"
+            return ""
+
         @_agent.tool_plain
         async def search_knowledge_base(query: str) -> str:
             """
-            Search the internal knowledge base for details about products, services, or company policies.
-            Use this tool when a customer asks a specific question that requires company-specific knowledge.
-            
+            Search the internal knowledge base for details to answer customer questions.  
             Args:
                 query: The search terms or question to look up.
             """
@@ -346,6 +359,16 @@ async def get_chat_response(prompt: str, customer_id: int, db: AsyncSession) -> 
     """
     # Get chat history for context
     messages = await get_customer_messages(db, customer_id)
+    
+    # Truncate history to prevent token limits (Groq TPM limit)
+    # Keep up to 10 recent messages, ensuring the oldest is a UserPrompt
+    if len(messages) > 10:
+        messages = messages[-10:]
+        while messages:
+            first = messages[0]
+            if isinstance(first, ModelRequest) and first.parts and isinstance(first.parts[0], UserPromptPart):
+                break
+            messages.pop(0)
 
     # Get the agent instance
     agent = get_agent()
@@ -401,6 +424,15 @@ async def stream_chat_response(
 
     # Get chat history for context
     messages = await get_customer_messages(db, customer_id)
+    
+    # Truncate history to prevent token limits (Groq TPM limit)
+    if len(messages) > 10:
+        messages = messages[-10:]
+        while messages:
+            first = messages[0]
+            if isinstance(first, ModelRequest) and first.parts and isinstance(first.parts[0], UserPromptPart):
+                break
+            messages.pop(0)
 
     # Get the agent instance
     agent = get_agent()
@@ -468,7 +500,7 @@ async def send_direct_message(
 
             # Normalize phone number to WhatsApp format (phone@c.us)
             phone = customer.phone_number.replace("+", "").replace(" ", "").replace("-", "")
-            chat_id = f"{phone}@c.us"
+            chat_id = f"{phone}@lid"
 
             response = await send_whatsapp_message(chat_id, message)
 

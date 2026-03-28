@@ -1,10 +1,11 @@
-import { Search, Settings, Puzzle, GitFork } from "lucide-react";
+import { Search, Settings, Puzzle, GitFork, LogOut, BarChart2, MessageSquare, Layout, Mail, Globe } from "lucide-react";
 import { useState } from "react";
 import type React from "react";
 import { Chat, currentUser } from "../data/mockChats";
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
 import { PlatformIcon } from "./PlatformIcon";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { useAuth } from "../lib/auth";
 interface ChatSidebarProps {
   chats: Chat[];
   activeId: string | null;
@@ -13,16 +14,21 @@ interface ChatSidebarProps {
 
 export function ChatSidebar({ chats, activeId, onSelect }: ChatSidebarProps) {
   const [search, setSearch] = useState("");
+  const [selectedChannel, setSelectedChannel] = useState<string>("all");
   const router = useRouter();
+  const pathname = usePathname();
+  const { logout } = useAuth();
 
-  const filtered = chats.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = chats.filter((c) => {
+    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase());
+    const matchesChannel = selectedChannel === "all" || c.platform === selectedChannel;
+    return matchesSearch && matchesChannel;
+  });
 
   return (
     <aside className="w-full border-r border-border flex flex-col bg-sidebar h-full animate-[slide-in-left_400ms_cubic-bezier(0.16,1,0.3,1)]">
       {/* Profile header */}
-      <div className="p-4 border-b border-border flex items-center justify-between animate-[fade-in_300ms_cubic-bezier(0.16,1,0.3,1)_100ms_backwards]">
+      <div className="p-4 border-b border-border flex items-center justify-between animate-[fade-in_300ms_cubic-bezier(0.16,1,0.3,1)_100ms_backwards] group relative">
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9">
             <AvatarImage src={currentUser.avatar} alt={currentUser.name} />
@@ -63,6 +69,27 @@ export function ChatSidebar({ chats, activeId, onSelect }: ChatSidebarProps) {
         </div>
       </div>
 
+      <div className="px-3 py-4 space-y-1 animate-[fade-in_300ms_cubic-bezier(0.16,1,0.3,1)_150ms_backwards]">
+        <button
+          onClick={() => router.push("/")}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 group text-sm font-medium ${
+            pathname === "/" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent"
+          }`}
+        >
+          <MessageSquare className={`h-4 w-4 ${pathname === "/" ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`} />
+          Conversations
+        </button>
+        <button
+          onClick={() => router.push("/insights")}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all duration-200 group text-sm font-medium ${
+            pathname.includes("/insights") ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-accent"
+          }`}
+        >
+          <Layout className={`h-4 w-4 ${pathname.includes("/insights") ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`} />
+          Intelligence Dashboard
+        </button>
+      </div>
+
       {/* Search */}
       <div className="px-3 py-2 animate-[fade-in_300ms_cubic-bezier(0.16,1,0.3,1)_200ms_backwards]">
         <div className="flex items-center gap-2 rounded-md bg-accent px-3 py-1.5 transition-all duration-200 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background">
@@ -75,6 +102,38 @@ export function ChatSidebar({ chats, activeId, onSelect }: ChatSidebarProps) {
             className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-full leading-normal"
           />
         </div>
+      </div>
+
+      {/* Channel Switcher */}
+      <div className="px-3 py-3 border-b border-border flex flex-wrap gap-2 animate-[fade-in_300ms_cubic-bezier(0.16,1,0.3,1)_250ms_backwards]">
+        {[
+          { id: "all", label: "All", icon: MessageSquare },
+          { id: "whatsapp", label: "WhatsApp", icon: PlatformIcon, color: "hover:text-whatsapp" },
+          { id: "telegram", label: "Telegram", icon: PlatformIcon, color: "hover:text-telegram" },
+          { id: "email", label: "Email", icon: Mail, color: "hover:text-blue-500" },
+          { id: "web", label: "Web", icon: Globe, color: "hover:text-primary" },
+        ].map((channel) => (
+          <button
+            key={channel.id}
+            onClick={() => setSelectedChannel(channel.id)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 border border-transparent hover:border-border active:scale-95 ${
+              selectedChannel === channel.id
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : `bg-accent/40 text-muted-foreground ${channel.color || "hover:text-foreground"}`
+            }`}
+          >
+            {channel.id === "whatsapp" || channel.id === "telegram" ? (
+              <PlatformIcon platform={channel.id as any} size={12} />
+            ) : channel.id === "all" ? (
+              <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+            ) : channel.id === "email" ? (
+              <Mail className="h-3.5 w-3.5 shrink-0" />
+            ) : (
+              <Globe className="h-3.5 w-3.5 shrink-0" />
+            )}
+            {channel.label}
+          </button>
+        ))}
       </div>
 
       {/* Chat list */}
@@ -127,6 +186,17 @@ export function ChatSidebar({ chats, activeId, onSelect }: ChatSidebarProps) {
             )}
           </button>
         ))}
+      </div>
+
+      {/* Sidebar Footer (Logout) */}
+      <div className="p-4 border-t border-border mt-auto animate-[fade-in_300ms_cubic-bezier(0.16,1,0.3,1)_500ms_backwards]">
+        <button
+          onClick={logout}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-red-500 hover:text-red-600 hover:bg-red-500/10 transition-all duration-200 border border-transparent hover:border-red-500/20 active:scale-[0.98]"
+        >
+          <LogOut className="h-4 w-4" />
+          <span>Sign out from ChatIQ</span>
+        </button>
       </div>
     </aside>
   );

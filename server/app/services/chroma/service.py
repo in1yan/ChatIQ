@@ -63,7 +63,6 @@ class ChromaVectorService:
     def ingest_file(
         self,
         file_path: str,
-        namespace: str = "documents",
         extra_metadata: dict[str, Any] | None = None,
     ) -> int:
         """Read a PDF or text file, chunk it, and store chunks in ChromaDB."""
@@ -92,7 +91,6 @@ class ChromaVectorService:
         ids: list[str] = []
 
         base_metadata = {
-            "namespace": namespace,
             "file_name": path.name,
             "file_path": str(path.resolve()),
             "file_type": file_type,
@@ -117,42 +115,35 @@ class ChromaVectorService:
     def search_documents(
         self,
         query_text: str,
-        namespace: str = "documents",
         n_results: int = 5,
     ) -> dict[str, Any]:
         """Search similar chunks from ingested files."""
         return self._collection.query(
             query_texts=[query_text],
             n_results=n_results,
-            where={"namespace": namespace},
         )
 
-    def delete_documents(self, namespace: str, file_name: str | None = None) -> None:
-        """Delete documents matching the namespace and optionally file name."""
+    def delete_documents(self, file_name: str | None = None) -> None:
+        """Delete documents matching the file name."""
         if file_name:
-            where_filter = {"$and": [{"namespace": namespace}, {"file_name": file_name}]}
-        else:
-            where_filter = {"namespace": namespace}
-        self._collection.delete(where=where_filter)
+            where_filter = {"file_name": file_name}
+            self._collection.delete(where=where_filter)
 
-    def list_documents(self, namespace: str | None = None) -> list[dict[str, Any]]:
+    def list_documents(self) -> list[dict[str, Any]]:
         """Return unique document metadata from the collection."""
-        where_filter = {"namespace": namespace} if namespace else None
         results = self._collection.get(
             include=["metadatas"],
-            where=where_filter,
         )
         
-        # Extract unique documents by file_name and namespace
+        # Extract unique documents by file_name
         seen = set()
         docs = []
         for metadata in (results.get("metadatas") or []):
-            doc_id = f"{metadata.get('namespace')}:{metadata.get('file_name')}"
-            if doc_id not in seen:
-                seen.add(doc_id)
+            file_name = metadata.get("file_name")
+            if file_name not in seen:
+                seen.add(file_name)
                 docs.append({
-                    "file_name": metadata.get("file_name"),
-                    "namespace": metadata.get("namespace"),
+                    "file_name": file_name,
                     "file_type": metadata.get("file_type"),
                     "file_path": metadata.get("file_path"),
                 })

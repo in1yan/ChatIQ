@@ -1,8 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
-import { MessageSquare } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { MessageSquare, Loader2 } from "lucide-react";
 import { ChatSidebar } from "./components/ChatSidebar";
 import { ChatView } from "./components/ChatView";
+import { useAuth } from "./lib/auth";
 
 export type Platform = "whatsapp" | "telegram" | "email" | "web";
 export interface Message {
@@ -24,12 +26,22 @@ export interface Chat {
 }
 
 export default function Home() {
+  const { isAuthenticated } = useAuth();
+  const router = useRouter();
+
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(320); 
   const [isResizing, setIsResizing] = useState(false);
 
   useEffect(() => {
+    if (isAuthenticated === false) {
+      router.push("/login");
+    }
+  }, [isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
     const fetchCustomers = async () => {
       try {
         const res = await fetch("http://localhost:8000/api/v1/chat/customers/all");
@@ -58,10 +70,10 @@ export default function Home() {
     fetchCustomers();
     const interval = setInterval(fetchCustomers, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    if (!activeId) return;
+    if (!isAuthenticated || !activeId) return;
 
     const fetchMessages = async () => {
       try {
@@ -135,6 +147,14 @@ export default function Home() {
   };
 
   const activeChat = chats.find((c) => c.id === activeId) ?? null;
+
+  if (isAuthenticated === null || isAuthenticated === false) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
