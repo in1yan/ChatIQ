@@ -73,3 +73,45 @@ class ChatResponse(BaseModel):
                 "customer_id": 123,
             }
         }
+
+
+class SendMessageRequest(BaseModel):
+    """Request to send a direct message to a customer."""
+
+    customer_id: int = Field(..., description="Customer ID to send message to")
+    message: str = Field(..., min_length=1, max_length=4096, description="Message content")
+    channel: Literal["whatsapp", "telegram"] = Field(
+        ..., description="Target channel (whatsapp or telegram)"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "customer_id": 123,
+                "message": "Your order has been shipped!",
+                "channel": "whatsapp",
+            }
+        }
+
+
+class SendMessageResponse(BaseModel):
+    """Response from sending a direct message."""
+
+    success: bool = Field(..., description="Whether the message was sent successfully")
+    message_id: Optional[str] = Field(
+        None, description="Message ID from the channel (if available)"
+    )
+    timestamp: str = Field(..., description="ISO timestamp of when message was sent")
+    channel: str = Field(..., description="Channel the message was sent to")
+    customer_id: int = Field(..., description="Customer ID message was sent to")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message_id": "wamid.xxxx=",
+                "timestamp": "2024-03-27T12:00:00Z",
+                "channel": "whatsapp",
+                "customer_id": 123,
+            }
+        }
