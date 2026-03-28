@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:5173"
     # AI services
     GROQ_API_KEY: str
+    # ChromaDB vector store
+    CHROMA_PERSIST_DIR: str = ".chroma"
+    CHROMA_COLLECTION_NAME: str = "chatiq_messages"
     # Whatsapp services
     WAHA_BASE_URL: str = "http://localhost:3000/api"
     WAHA_API_KEY: str
