@@ -46,7 +46,7 @@ def get_agent() -> Agent:
             "You will hold full conversation with customers convincing them to buy products or resolve issues. "
             "Always generate response in plain text don't use markdown. "
             "IMPORTANT: Use the 'search_knowledge_base' tool whenever a customer asks for specific information "
-            "that you don't know, such as product details, discount codes, or company policies. "
+            "that you don't know"
             "Do NOT make up information. If the information is not in the knowledge base, say so."
         )
         
@@ -55,9 +55,7 @@ def get_agent() -> Agent:
         @_agent.tool_plain
         async def search_knowledge_base(query: str) -> str:
             """
-            Search the internal knowledge base for details about products, services, or company policies.
-            Use this tool when a customer asks a specific question that requires company-specific knowledge.
-            
+            Search the internal knowledge base for details to answer customer questions.  
             Args:
                 query: The search terms or question to look up.
             """
