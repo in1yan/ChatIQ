@@ -99,7 +99,8 @@ const Integrations = () => {
               <Button
                 variant={item.connected ? "outline" : "default"}
                 size="sm"
-                className="shrink-0"
+                className="shrink-0 active:scale-95 transition-transform"
+                aria-label={item.connected ? `Manage ${item.name} integration` : `Connect ${item.name}`}
               >
                 {item.connected ? "Manage" : "Connect"}
               </Button>

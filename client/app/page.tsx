@@ -31,8 +31,7 @@ export default function Home() {
 
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [sidebarWidth, setSidebarWidth] = useState(320); 
-  const [isResizing, setIsResizing] = useState(false);
+  const [sidebarWidth] = useState(320);
 
   useEffect(() => {
     if (isAuthenticated === false) {
@@ -49,7 +48,7 @@ export default function Home() {
         const data = await res.json();
         
         setChats(prevChats => {
-          return data.map((c: any) => {
+          return data.map((c: { id: number; full_name?: string; telegram_username?: string; phone_number?: string; profile_picture_url?: string; created_at: string; channel: Platform; ai_paused: boolean }) => {
             const existing = prevChats.find(pc => pc.id === String(c.id));
             return {
               id: String(c.id),
@@ -64,7 +63,7 @@ export default function Home() {
             };
           });
         });
-      } catch (err) { }
+      } catch { }
     };
 
     fetchCustomers();
@@ -109,13 +108,13 @@ export default function Home() {
             lastMessage: newMessages[newMessages.length - 1]?.text || "..."
           } : c
         ));
-      } catch (err) {}
+      } catch {}
     };
 
     fetchMessages();
     const interval = setInterval(fetchMessages, 5000);
     return () => clearInterval(interval);
-  }, [activeId]);
+  }, [activeId, isAuthenticated]);
 
   const handleSend = async (chatId: string, text: string) => {
     setChats((prev) =>
@@ -136,14 +135,14 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text }),
       });
-    } catch(err) { console.error("Send failed", err); }
+    } catch {}
   };
 
   const handleToggleAi = async (chatId: string) => {
     try {
       setChats(prev => prev.map(c => c.id === chatId ? { ...c, ai_paused: !c.ai_paused } : c));
       await fetch(`http://localhost:8000/api/v1/chat/${chatId}/toggle-ai`, { method: "POST" });
-    } catch(err) {}
+    } catch {}
   };
 
   const activeChat = chats.find((c) => c.id === activeId) ?? null;
@@ -159,27 +158,30 @@ export default function Home() {
   return (
     <div className="flex h-screen w-full overflow-hidden">
       <div 
-        className={`relative shrink-0 ${isResizing ? 'resizing-sidebar' : ''}`}
+        className="relative shrink-0"
         style={{ width: `${sidebarWidth}px` }}
+        role="complementary"
+        aria-label="Chat sidebar"
       >
         <ChatSidebar chats={chats} activeId={activeId} onSelect={setActiveId} />
         
         <div
-          onMouseDown={() => setIsResizing(true)}
-          className={`absolute top-0 right-0 bottom-0 w-1 hover:w-1.5 bg-transparent hover:bg-primary/20 cursor-col-resize transition-all duration-150 z-10`}
+          className="absolute top-0 right-0 bottom-0 w-1 hover:w-1.5 bg-transparent hover:bg-primary/20 cursor-col-resize transition-all duration-150 z-10"
+          role="separator"
+          aria-label="Resize sidebar"
         />
       </div>
       {activeChat ? (
         <ChatView chat={activeChat} onSend={handleSend} onToggleAi={() => handleToggleAi(activeChat.id)} />
       ) : (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground">
+        <main className="flex-1 flex items-center justify-center text-muted-foreground" role="main" aria-label="Chat view">
           <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/5 flex items-center justify-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/5 flex items-center justify-center" aria-hidden="true">
               <MessageSquare className="h-8 w-8 text-primary/40" />
             </div>
-            <p className="text-base leading-normal">Select a conversation</p>
+            <p className="text-base leading-normal">Select a conversation to start messaging</p>
           </div>
-        </div>
+        </main>
       )}
     </div>
   );

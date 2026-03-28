@@ -35,8 +35,8 @@ const AgentPage = () => {
         const data = await res.json();
         setDocuments(data.documents || []);
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
+      // Silent fail - documents are non-critical
     } finally {
       setIsLoadingDocs(false);
     }
@@ -50,8 +50,7 @@ const AgentPage = () => {
         const data = await res.json();
         setInstructions(data.instructions || []);
       }
-    } catch (e) {
-      console.error(e);
+    } catch {
       toast.error('Failed to load instructions');
     } finally {
       setIsLoadingInstructions(false);

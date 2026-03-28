@@ -181,9 +181,13 @@ export function AuthCard({ mode = "login" }: { mode?: "login" | "signup" }) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@company.com"
+                    required
+                    aria-required="true"
+                    aria-invalid={!!emailError}
+                    aria-describedby={emailError ? "email-error" : undefined}
                     className={cn(inputStyle, emailError && "border-destructive/60 focus-visible:border-destructive")}
                   />
-                  {emailError && <p className="text-xs text-destructive mt-2 absolute -bottom-5 left-0">{emailError}</p>}
+                  {emailError && <p id="email-error" className="text-xs text-destructive mt-2 absolute -bottom-5 left-0" role="alert">{emailError}</p>}
                 </div>
 
                 <div className="space-y-1 pt-2">
@@ -199,6 +203,8 @@ export function AuthCard({ mode = "login" }: { mode?: "login" | "signup" }) {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
+                    required
+                    aria-required="true"
                     className={inputStyle}
                   />
                 </div>
@@ -309,8 +315,8 @@ export function AuthCard({ mode = "login" }: { mode?: "login" | "signup" }) {
           </div>
 
           <p className="mt-10 text-center text-xs text-muted-foreground">
-            By continuing, you agree to ChatIQ's{" "}
-            <Link href="#" className="underline hover:text-foreground transition-colors">Terms of Service</Link> &{" "}
+            By continuing, you agree to ChatIQ&apos;s{" "}
+            <Link href="#" className="underline hover:text-foreground transition-colors">Terms of Service</Link> &amp;{" "}
             <Link href="#" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>.
           </p>
 

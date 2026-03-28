@@ -2,6 +2,7 @@
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Flame } from "lucide-react";
 
 interface TrendingTopicsProps {
   topics: string[];
@@ -14,13 +15,13 @@ export function TrendingTopics({ topics }: TrendingTopicsProps) {
   }));
 
   return (
-    <Card className="bg-zinc-900/40 border-white/5 backdrop-blur-xl h-[420px] flex flex-col group overflow-hidden">
+    <Card className="bg-zinc-900/40 border-white/5 backdrop-blur-xl h-[420px] flex flex-col group overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-2xl hover:shadow-primary/10">
       <CardHeader className="pb-2">
          <div className="flex items-center justify-between">
            <CardTitle className="text-xs font-bold text-zinc-500 uppercase tracking-[0.15em]">
              Topic Frequency
            </CardTitle>
-           <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
+           <Flame className="w-4 h-4 text-primary animate-[pulse-subtle_2s_ease-in-out_infinite]" />
          </div>
       </CardHeader>
       <CardContent className="flex-1 pt-6 px-6">
@@ -56,11 +57,12 @@ export function TrendingTopics({ topics }: TrendingTopicsProps) {
                 }}
                 labelStyle={{ display: "none" }}
               />
-              <Bar dataKey="count" radius={[0, 10, 10, 0]} animationDuration={1800}>
+              <Bar dataKey="count" radius={[0, 10, 10, 0]} animationDuration={1800} animationEasing="ease-out">
                 {chartData.map((_, index) => (
                   <Cell
                     key={`cell-${index}`}
                     fill={index === 0 ? "hsl(var(--primary))" : `hsla(var(--primary), ${0.8 - index * 0.15})`}
+                    className="hover:opacity-80 transition-opacity cursor-pointer"
                   />
                 ))}
               </Bar>
@@ -68,7 +70,10 @@ export function TrendingTopics({ topics }: TrendingTopicsProps) {
           </ResponsiveContainer>
         </div>
         <div className="mt-4 flex items-center justify-between text-[11px] text-zinc-500 font-medium px-2">
-           <span className="uppercase tracking-widest text-[9px] font-bold">Volume</span>
+           <span className="uppercase tracking-widest text-[9px] font-bold flex items-center gap-1.5">
+             <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+             Volume
+           </span>
            <span className="text-zinc-400">Updates every 10 min</span>
         </div>
       </CardContent>

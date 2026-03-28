@@ -14,10 +14,10 @@ export function SentimentChart({ data }: SentimentChartProps) {
   }));
 
   const COLORS = {
-    positive: "hsl(var(--primary))",
-    neutral: "#71717a",
-    negative: "#f43f5e",
-    default: "hsl(var(--primary) / 0.5)",
+    positive: "hsl(var(--success))",
+    neutral: "hsl(var(--warning))",
+    negative: "hsl(var(--destructive))",
+    default: "hsl(var(--info))",
   };
 
   const getCellColor = (name: string) => {
@@ -29,13 +29,13 @@ export function SentimentChart({ data }: SentimentChartProps) {
   };
 
   return (
-    <Card className="bg-zinc-900/40 border-white/5 backdrop-blur-xl h-[420px] flex flex-col group overflow-hidden">
+    <Card className="bg-zinc-900/40 border-white/5 backdrop-blur-xl h-[420px] flex flex-col group overflow-hidden transition-all duration-300 hover:border-success/30 hover:shadow-2xl hover:shadow-success/10">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
           <CardTitle className="text-xs font-bold text-zinc-500 uppercase tracking-[0.15em]">
             Sentimental Analysis
           </CardTitle>
-          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
         </div>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col justify-center pb-8 pt-4">
@@ -88,7 +88,7 @@ export function SentimentChart({ data }: SentimentChartProps) {
           {/* Centered value indicator */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none translate-y-[-18px]">
              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest leading-none mb-1">Health</p>
-             <p className="text-3xl font-semibold text-white tracking-tighter leading-none">84%</p>
+             <p className="text-3xl font-semibold text-success tracking-tighter leading-none">84%</p>
           </div>
         </div>
         <p className="text-[11px] text-zinc-500 text-center px-6 leading-relaxed">
