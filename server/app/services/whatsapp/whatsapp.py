@@ -72,7 +72,7 @@ async def send_whatsapp_message(chat_id: str, message: str, session: str = "defa
             f"{WAHA_BASE_URL}/sendText", json=payload, headers=headers
         )
         response.raise_for_status()
-        return response.json()
+        return response.json() if response.text.strip() else {"status": "success"}
 
 
 async def start_typing(chat_id: str, session: str = "default"):

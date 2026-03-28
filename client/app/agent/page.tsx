@@ -18,7 +18,8 @@ const AgentPage = () => {
   const [file, setFile] = useState<File | null>(null);
   const [instructionContent, setInstructionContent] = useState('');
   const [selectedInstruction, setSelectedInstruction] = useState<string | null>(null);
-  const [instructions, setInstructions] = useState<string[]>(['Default instruction set']);
+  const [instructions, setInstructions] = useState<string[]>([]);
+  const [isLoadingInstructions, setIsLoadingInstructions] = useState(false);
   const [viewMode, setViewMode] = useState<'write' | 'preview'>('write');
   const [isSaving, setIsSaving] = useState(false);
   
@@ -41,8 +42,25 @@ const AgentPage = () => {
     }
   };
 
+  const fetchInstructions = async () => {
+    setIsLoadingInstructions(true);
+    try {
+      const res = await fetch("http://localhost:8000/api/v1/agent/config");
+      if (res.ok) {
+        const data = await res.json();
+        setInstructions(data.instructions || []);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to load instructions');
+    } finally {
+      setIsLoadingInstructions(false);
+    }
+  };
+
   useEffect(() => {
     fetchDocuments();
+    fetchInstructions();
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,39 +122,68 @@ const AgentPage = () => {
     
     setIsSaving(true);
     
-    // Simulate save delay for smooth feedback
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
+    let updatedInstructions;
     if (selectedInstruction) {
       // Update existing instruction
-      const updatedInstructions = instructions.map(inst => 
+      updatedInstructions = instructions.map(inst => 
         inst === selectedInstruction ? instructionContent : inst
       );
-      setInstructions(updatedInstructions);
-      setSelectedInstruction(null);
     } else {
       // Add new instruction
-      setInstructions([...instructions, instructionContent]);
+      updatedInstructions = [...instructions, instructionContent];
     }
     
-    setInstructionContent('');
-    setIsManagingInstructions(false);
-    setIsSaving(false);
-    
-    toast.success('Instruction saved', {
-      description: 'Your custom instruction has been saved.',
-    });
+    try {
+      const res = await fetch("http://localhost:8000/api/v1/agent/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instructions: updatedInstructions }),
+      });
+      if (!res.ok) throw new Error("Failed to save instructions");
+      
+      const data = await res.json();
+      setInstructions(data.instructions);
+      setSelectedInstruction(null);
+      setInstructionContent('');
+      setIsManagingInstructions(false);
+      
+      toast.success('Instruction saved', {
+        description: 'Your custom instruction has been saved.',
+      });
+    } catch (error) {
+      toast.error('Save failed', {
+        description: 'There was an error saving your instruction.',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDeleteInstruction = (instruction: string) => {
-    setInstructions(instructions.filter(inst => inst !== instruction));
-    if (selectedInstruction === instruction) {
-      setSelectedInstruction(null);
-    }
+  const handleDeleteInstruction = async (instruction: string) => {
+    const updatedInstructions = instructions.filter(inst => inst !== instruction);
     
-    toast.error('Instruction deleted', {
-      description: 'The instruction has been removed.',
-    });
+    try {
+      const res = await fetch("http://localhost:8000/api/v1/agent/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instructions: updatedInstructions }),
+      });
+      if (!res.ok) throw new Error("Failed to delete instruction");
+      
+      const data = await res.json();
+      setInstructions(data.instructions);
+      if (selectedInstruction === instruction) {
+        setSelectedInstruction(null);
+      }
+      
+      toast.error('Instruction deleted', {
+        description: 'The instruction has been removed.',
+      });
+    } catch (error) {
+      toast.error('Delete failed', {
+        description: 'There was an error deleting your instruction.',
+      });
+    }
   };
 
   return (
@@ -508,10 +555,16 @@ const AgentPage = () => {
                 </article>
               ))}
               
-              {instructions.length === 0 && (
+              {instructions.length === 0 && !isLoadingInstructions && (
                 <p className="text-sm text-muted-foreground text-center py-8 animate-[fade-in_400ms_cubic-bezier(0.16,1,0.3,1)_400ms_backwards]">
                   No custom instructions yet
                 </p>
+              )}
+              {isLoadingInstructions && (
+                <div className="flex justify-center items-center py-6 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  <span className="text-sm">Loading instructions...</span>
+                </div>
               )}
             </div>
           </section>

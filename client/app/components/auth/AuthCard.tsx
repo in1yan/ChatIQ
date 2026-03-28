@@ -298,7 +298,9 @@ export function AuthCard({ mode = "login" }: { mode?: "login" | "signup" }) {
             </div>
 
             <Button
+              type="button"
               variant="outline"
+              onClick={() => window.location.href = "http://localhost:8000/api/v1/auth/oauth/google"}
               className="w-full mt-8 h-12 text-sm font-medium rounded-lg bg-transparent border-border/60 hover:bg-secondary/40 transition-all active:scale-[0.98]"
             >
               <GoogleIcon />
