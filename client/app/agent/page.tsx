@@ -1,8 +1,8 @@
 'use client';
 
-import { ArrowLeft, Folder, List, Brain, Settings as SettingsIcon, Upload, Trash2, Eye, Edit3 } from 'lucide-react';
+import { ArrowLeft, Folder, List, Brain, Settings as SettingsIcon, Upload, Trash2, Eye, Edit3, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '../components/ui/button';
@@ -21,6 +21,29 @@ const AgentPage = () => {
   const [instructions, setInstructions] = useState<string[]>(['Default instruction set']);
   const [viewMode, setViewMode] = useState<'write' | 'preview'>('write');
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Knowledge Base State
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(false);
+
+  const fetchDocuments = async () => {
+    setIsLoadingDocs(true);
+    try {
+      const res = await fetch("http://localhost:8000/api/v1/knowledge/documents?namespace=default");
+      if (res.ok) {
+        const data = await res.json();
+        setDocuments(data.documents || []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoadingDocs(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -33,19 +56,46 @@ const AgentPage = () => {
     
     setIsImporting(true);
     
-    // Simulate import process
+    const formData = new FormData();
+    formData.append("file", file);
+
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const res = await fetch("http://localhost:8000/api/v1/knowledge/ingest?namespace=default", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      
       toast.success('Knowledge base imported', {
         description: 'Your custom knowledge base has been successfully imported.',
       });
       setFile(null);
-    } catch (error) {
+      fetchDocuments();
+    } catch (error: any) {
       toast.error('Import failed', {
-        description: 'There was an error importing your knowledge base.',
+        description: error.message || 'There was an error importing your knowledge base.',
       });
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  const handleDeleteDocument = async (fileName: string) => {
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/knowledge/documents?namespace=default&file_name=${encodeURIComponent(fileName)}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        toast.success('Document deleted', { description: `Successfully removed ${fileName}` });
+        fetchDocuments();
+      } else {
+        throw new Error(await res.text());
+      }
+    } catch (e) {
+      toast.error('Delete failed', { description: 'Could not remove document' });
     }
   };
 
@@ -247,12 +297,45 @@ const AgentPage = () => {
                       className="w-full transition-all duration-200 active:scale-[0.98]"
                       disabled={!file || isImporting}
                     >
+                      {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       {isImporting ? 'Importing...' : 'Import Knowledge Base'}
                     </Button>
                   </div>
                 </DialogContent>
               </Dialog>
             </div>
+            
+            {/* Render uploaded documents */}
+            {isLoadingDocs ? (
+              <div className="flex justify-center items-center py-6 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                <span className="text-sm">Loading documents...</span>
+              </div>
+            ) : documents.length > 0 ? (
+              <div className="mt-4 space-y-2 border-t border-border pt-4">
+                <h3 className="text-sm font-medium text-foreground mb-3">Uploaded Documents</h3>
+                <div className="grid grid-cols-1 gap-2">
+                  {documents.map((doc, i) => (
+                    <div key={i} className="flex items-center justify-between p-3 border border-border rounded-md bg-background/50 hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <List className="h-4 w-4 text-primary" />
+                        <p className="text-sm font-medium text-foreground">{doc.file_name}</p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleDeleteDocument(doc.file_name)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground mt-4 pt-4 border-t border-border">No documents uploaded yet. Import files to build your knowledge base!</p>
+            )}
           </section>
 
           {/* Custom Instructions Section */}
