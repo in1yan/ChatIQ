@@ -30,7 +30,7 @@ from app.models import Customer, Message
 
 # Global agent instance (lazy initialization)
 _agent: Agent | None = None
-model = "qwen/qwen3-32b"
+model = "openai/gpt-oss-120b"
 
 
 def get_agent() -> Agent:
@@ -40,7 +40,7 @@ def get_agent() -> Agent:
         # Initialize the AI agent with OpenAI GPT-5.2
         # Make sure OPENAI_API_KEY is set in environment
         gm = GroqModel(model, provider=GroqProvider(api_key=settings.GROQ_API_KEY))
-        _agent = Agent(model=gm)
+        _agent = Agent(model=gm, system_prompt="You are a helpful customer support assistant. You will hold full on converstion with customers convincing them to buy products or reolve issue. Always generate response in plain text don't use markdown.")
     return _agent
 
 
@@ -112,6 +112,12 @@ async def get_or_create_customer(
     existing_customer = result.scalar_one_or_none()
 
     if existing_customer:
+        # Update full_name if provided and different
+        full_name = metadata.get("full_name")
+        if full_name and existing_customer.full_name != full_name:
+            existing_customer.full_name = full_name
+            await db.commit()
+            await db.refresh(existing_customer)
         return existing_customer
 
     # Fetch profile picture for WhatsApp customers (only on creation)

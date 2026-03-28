@@ -41,9 +41,9 @@ async def whatsapp_webhook(request: Request, db: AsyncSession = Depends(get_db))
         logger.info("📨 WhatsApp Webhook Event Received")
         logger.info(f"Raw Data: {data}")
 
-        # Extract payload
-        payload = data.get("payload", {})
-        event = data.get("event")
+        # Extract payload (handle both nested and flat structures)
+        payload = data.get("payload") or data
+        event = data.get("event", "message")
 
         # Only process incoming messages (not our own)
         from_me = payload.get("fromMe", False)
@@ -55,10 +55,10 @@ async def whatsapp_webhook(request: Request, db: AsyncSession = Depends(get_db))
         if event != "message":
             logger.info(f"⏭️ Skipping non-message event: {event}")
             return {"status": "skipped", "reason": f"event_type_{event}"}
-
+        print(payload)
         # Extract message details
         chat_id = payload.get("from")
-        full_name = payload.get("author")
+        full_name = payload.get("notifyName")
         message_text = payload.get("body")
         message_id = payload.get("id")
 
