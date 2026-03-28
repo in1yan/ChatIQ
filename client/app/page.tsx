@@ -1,113 +1,161 @@
 "use client";
 import { useState, useEffect } from "react";
 import { MessageSquare } from "lucide-react";
-import { chats as initialChats, Chat, Message } from "./data/mockChats";
 import { ChatSidebar } from "./components/ChatSidebar";
 import { ChatView } from "./components/ChatView";
 
+export type Platform = "whatsapp" | "telegram" | "email" | "web";
+export interface Message {
+  id: string;
+  senderId: string;
+  text: string;
+  timestamp: string;
+}
+export interface Chat {
+  id: string;
+  name: string;
+  avatar: string;
+  lastMessage: string;
+  timestamp: string;
+  unread: number;
+  platform: Platform;
+  ai_paused: boolean;
+  messages: Message[];
+}
+
 export default function Home() {
-  const [chats, setChats] = useState<Chat[]>(initialChats);
-  const [activeId, setActiveId] = useState<string | null>(
-    initialChats[0]?.id ?? null,
-  );
-  const [sidebarWidth, setSidebarWidth] = useState(320); // Default 320px (w-80)
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(320); 
   const [isResizing, setIsResizing] = useState(false);
 
   useEffect(() => {
-    const savedWidth = localStorage.getItem('sidebar-width');
-    if (savedWidth) {
-      setSidebarWidth(parseInt(savedWidth, 10));
-    }
+    const fetchCustomers = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/v1/chat/customers/all");
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        setChats(prevChats => {
+          return data.map((c: any) => {
+            const existing = prevChats.find(pc => pc.id === String(c.id));
+            return {
+              id: String(c.id),
+              name: c.full_name || c.telegram_username || c.phone_number || "Unknown User",
+              avatar: c.profile_picture_url || `https://api.dicebear.com/9.x/notionists/svg?seed=${c.id}`,
+              lastMessage: existing?.lastMessage || "...",
+              timestamp: new Date(c.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+              unread: 0,
+              platform: c.channel as Platform,
+              ai_paused: c.ai_paused,
+              messages: existing?.messages || []
+            };
+          });
+        });
+      } catch (err) { }
+    };
+
+    fetchCustomers();
+    const interval = setInterval(fetchCustomers, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    if (!isResizing) return;
+    if (!activeId) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const newWidth = Math.min(Math.max(e.clientX, 240), 600); // Min 240px, Max 600px
-      setSidebarWidth(newWidth);
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch(`http://localhost:8000/api/v1/chat/${activeId}`);
+        if (!res.ok) return;
+        const text = await res.text();
+        const lines = text.split("\n").filter(Boolean);
+        const parsedMessages = lines.map(line => JSON.parse(line));
+        
+        const newMessages: Message[] = parsedMessages.map((m: any, i: number) => {
+           let sender = m.role === "user" ? activeId : "ai"; // 'ai' by default
+           let contentText = m.content;
+           
+           if (m.role === "model" && contentText.startsWith("[AGENT] ")) {
+             sender = "agent";
+             contentText = contentText.replace("[AGENT] ", "");
+           } else if (m.role === "agent") {
+             sender = "agent";
+           }
+
+           return {
+             id: `msg-${i}`,
+             senderId: sender,
+             text: contentText,
+             timestamp: new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+           };
+        });
+
+        setChats(prev => prev.map(c => 
+          c.id === activeId ? { 
+            ...c, 
+            messages: newMessages,
+            lastMessage: newMessages[newMessages.length - 1]?.text || "..."
+          } : c
+        ));
+      } catch (err) {}
     };
 
-    const handleMouseUp = () => {
-      setIsResizing(false);
-      localStorage.setItem('sidebar-width', sidebarWidth.toString());
-    };
+    fetchMessages();
+    const interval = setInterval(fetchMessages, 5000);
+    return () => clearInterval(interval);
+  }, [activeId]);
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isResizing, sidebarWidth]);
-
-  const activeChat = chats.find((c) => c.id === activeId) ?? null;
-
-  const handleSend = (chatId: string, message: Message) => {
+  const handleSend = async (chatId: string, text: string) => {
     setChats((prev) =>
       prev.map((c) =>
         c.id === chatId
           ? {
               ...c,
-              messages: [...c.messages, message],
-              lastMessage: message.text,
-              timestamp: message.timestamp,
+              messages: [...c.messages, { id: `opt-${Date.now()}`, senderId: "agent", text, timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }],
+              lastMessage: text,
             }
           : c,
       ),
     );
+    
+    try {
+      await fetch(`http://localhost:8000/api/v1/chat/${chatId}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      });
+    } catch(err) { console.error("Send failed", err); }
   };
-  
+
+  const handleToggleAi = async (chatId: string) => {
+    try {
+      setChats(prev => prev.map(c => c.id === chatId ? { ...c, ai_paused: !c.ai_paused } : c));
+      await fetch(`http://localhost:8000/api/v1/chat/${chatId}/toggle-ai`, { method: "POST" });
+    } catch(err) {}
+  };
+
+  const activeChat = chats.find((c) => c.id === activeId) ?? null;
+
   return (
     <div className="flex h-screen w-full overflow-hidden">
-      <style jsx global>{`
-        /* Prevent text selection during resize */
-        .resizing-sidebar * {
-          user-select: none !important;
-          cursor: col-resize !important;
-        }
-      `}</style>
-      
       <div 
         className={`relative shrink-0 ${isResizing ? 'resizing-sidebar' : ''}`}
         style={{ width: `${sidebarWidth}px` }}
       >
         <ChatSidebar chats={chats} activeId={activeId} onSelect={setActiveId} />
         
-        {/* Resize Handle */}
         <div
           onMouseDown={() => setIsResizing(true)}
-          className={`absolute top-0 right-0 bottom-0 w-1 hover:w-1.5 bg-transparent hover:bg-primary/20 cursor-col-resize transition-all duration-150 group z-10 ${
-            isResizing ? 'w-1.5 bg-primary/30' : ''
-          }`}
-          role="separator"
-          aria-label="Resize sidebar"
-          aria-orientation="vertical"
-          aria-valuenow={sidebarWidth}
-          aria-valuemin={240}
-          aria-valuemax={600}
-        >
-          <div className={`absolute inset-y-0 right-0 w-px bg-border transition-opacity duration-150 ${
-            isResizing ? 'opacity-0' : ''
-          }`} />
-          
-          {/* Hover indicator */}
-          <div className="absolute top-1/2 -translate-y-1/2 right-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-            <div className="flex flex-col gap-1 -mr-0.5">
-              <div className="w-0.5 h-3 bg-primary/60 rounded-full" />
-              <div className="w-0.5 h-3 bg-primary/60 rounded-full" />
-            </div>
-          </div>
-        </div>
+          className={`absolute top-0 right-0 bottom-0 w-1 hover:w-1.5 bg-transparent hover:bg-primary/20 cursor-col-resize transition-all duration-150 z-10`}
+        />
       </div>
       {activeChat ? (
-        <ChatView chat={activeChat} onSend={handleSend} />
+        <ChatView chat={activeChat} onSend={handleSend} onToggleAi={() => handleToggleAi(activeChat.id)} />
       ) : (
         <div className="flex-1 flex items-center justify-center text-muted-foreground">
-          <div className="text-center animate-[fade-in_400ms_cubic-bezier(0.16,1,0.3,1)]">
+          <div className="text-center">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/5 flex items-center justify-center">
-              <MessageSquare className="h-8 w-8 text-primary/40 animate-[float_3s_ease-in-out_infinite]" />
+              <MessageSquare className="h-8 w-8 text-primary/40" />
             </div>
             <p className="text-base leading-normal">Select a conversation</p>
           </div>
