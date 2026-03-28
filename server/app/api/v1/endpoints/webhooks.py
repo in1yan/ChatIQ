@@ -4,6 +4,7 @@ Integrates with AI agent for automated customer support.
 """
 
 import logging
+
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -57,6 +58,7 @@ async def whatsapp_webhook(request: Request, db: AsyncSession = Depends(get_db))
 
         # Extract message details
         chat_id = payload.get("from")
+        full_name = payload.get("author")
         message_text = payload.get("body")
         message_id = payload.get("id")
 
@@ -78,16 +80,17 @@ async def whatsapp_webhook(request: Request, db: AsyncSession = Depends(get_db))
         logger.info(f"📱 Processing message from {phone_number}: {message_text}")
 
         # Show typing indicator
-        start_typing(chat_id)
+        await start_typing(chat_id)
 
         try:
-            # Get or create customer in database
+            # Get or create customer in database (with profile picture)
             customer = await get_or_create_customer(
                 db=db,
                 phone=phone_number,
                 email=None,
                 channel="whatsapp",
-                full_name=None,  # Could extract from WhatsApp contact name if available
+                chat_id=chat_id,  # Pass chat_id for profile picture fetching
+                full_name=full_name,
             )
 
             logger.info(f"👤 Customer ID: {customer.id}")
@@ -102,7 +105,7 @@ async def whatsapp_webhook(request: Request, db: AsyncSession = Depends(get_db))
             logger.info(f"🤖 AI Response: {ai_response[:100]}...")
 
             # Send response back to WhatsApp
-            whatsapp_response = send_whatsapp_message(chat_id, ai_response)
+            whatsapp_response = await send_whatsapp_message(chat_id, ai_response)
 
             logger.info(f"✅ Response sent to WhatsApp: {whatsapp_response}")
 
@@ -120,7 +123,7 @@ async def whatsapp_webhook(request: Request, db: AsyncSession = Depends(get_db))
             # Try to send error message to user
             try:
                 error_message = "Sorry, I encountered an error processing your message. Please try again later."
-                send_whatsapp_message(chat_id, error_message)
+                await send_whatsapp_message(chat_id, error_message)
             except:
                 pass  # Silently fail if can't send error message
 
@@ -128,12 +131,13 @@ async def whatsapp_webhook(request: Request, db: AsyncSession = Depends(get_db))
                 "status": "error",
                 "chat_id": chat_id,
                 "message": message_text,
+                "message_id": message_id,
                 "error": str(e),
             }
 
         finally:
             # Always stop typing indicator
-            stop_typing(chat_id)
+            await stop_typing(chat_id)
 
     except Exception as e:
         logger.error(f"❌ Webhook processing error: {e}")
