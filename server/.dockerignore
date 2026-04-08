@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+
+# Testing
+test_*.py
+TEST_README.md
+TESTING.md
+
+# Documentation
+*.md
+!README.md
+
+# Git
+.git/
+.gitignore
+
+# Chroma DB
+.chroma/
+
+# Migrations (optional - uncomment if you want to exclude)
+# migrations/

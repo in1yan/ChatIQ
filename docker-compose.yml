@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: chatiq-server
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=ChatIQ
+      - APP_VERSION=1.0.0
+      - DEBUG=True
+      - ENVIRONMENT=development
+      - HOST=0.0.0.0
+      - PORT=8000
+      - ALLOWED_HOSTS=["*"]
+      - FRONTEND_URL=http://localhost:3001
+    env_file:
+      - ./server/.env
+    volumes:
+      - ./server:/app
+      - /app/.venv
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    networks:
+      - chatiq-network
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=development
+    container_name: chatiq-client
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - NEXT_PUBLIC_API_URL=http://server:8000
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+      - /app/.next
+    command: pnpm dev
+    restart: unless-stopped
+    depends_on:
+      - server
+    networks:
+      - chatiq-network
+
+networks:
+  chatiq-network:
+    driver: bridge

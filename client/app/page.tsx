@@ -32,7 +32,9 @@ export default function Home() {
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [sidebarWidth] = useState(320);
-
+  // [TODO]
+  // [FIXME]
+  // [WARN]
   useEffect(() => {
     if (isAuthenticated === false) {
       router.push("/login");

@@ -31,7 +31,7 @@ from app.models import Customer, Message
 
 # Global agent instance (lazy initialization)
 _agent: Agent | None = None
-model = "openai/gpt-oss-120b"
+model = "openai/gpt-oss-20b"
 
 
 def get_agent() -> Agent:
@@ -41,7 +41,7 @@ def get_agent() -> Agent:
         # Initialize the AI agent with OpenAI GPT-5.2
         # Make sure OPENAI_API_KEY is set in environment
         gm = GroqModel(model, provider=GroqProvider(api_key=settings.GROQ_API_KEY))
-        
+
         system_prompt = (
             "You are a helpful customer support assistant for ChatIQ. "
             "You will hold full conversation with customers convincing them to buy products or resolve issues. "
@@ -52,7 +52,7 @@ def get_agent() -> Agent:
             "During the conversation, immediately use 'log_message_insight' when you detect upsell opportunities, service gaps, or strong sentiments. "
             "At the end of the conversation, use 'log_conversation_insight' to summarize the overall metrics like churn risk, customer segments, trending topics, and aspect based sentiments."
         )
-        
+
         _agent = Agent(model=gm, system_prompt=system_prompt)
 
         @_agent.system_prompt
@@ -60,44 +60,49 @@ def get_agent() -> Agent:
             """Append custom instructions from the database."""
             db = ctx.deps["db"]
             from sqlalchemy import select
+
             from app.models.agent_configs import AgentConfig
-            
-            result = await db.execute(select(AgentConfig).order_by(AgentConfig.id.desc()).limit(1))
+
+            result = await db.execute(
+                select(AgentConfig).order_by(AgentConfig.id.desc()).limit(1)
+            )
             config = result.scalar_one_or_none()
-            
+
             if config and config.custom_instructions:
-                instructions_text = "\n".join(f"- {inst}" for inst in config.custom_instructions)
+                instructions_text = "\n".join(
+                    f"- {inst}" for inst in config.custom_instructions
+                )
                 return f"### Additional Custom Instructions ###\n{instructions_text}\n"
             return ""
 
         @_agent.tool_plain
         async def search_knowledge_base(query: str) -> str:
             """
-            Search the internal knowledge base for details to answer customer questions.  
+            Search the internal knowledge base for details to answer customer questions.
             Args:
                 query: The search terms or question to look up.
             """
             from app.services.chroma.service import get_chroma_service
-            
+
             try:
                 chroma_service = get_chroma_service()
                 results = chroma_service.search_documents(query)
-                
+
                 # documents is a list of lists: [[doc1, doc2, ...]]
                 documents = results.get("documents", [])
                 if not documents or not documents[0]:
                     return "No relevant information found in the knowledge base."
-                
+
                 # Flatten the list of documents
                 flat_docs = []
                 for doc_list in documents:
                     for doc in doc_list:
                         if doc and doc.strip():
                             flat_docs.append(doc)
-                
+
                 if not flat_docs:
                     return "No relevant information found in the knowledge base."
-                
+
                 # Combine top result snippets
                 context = "\n---\n".join(flat_docs[:5])
                 return f"Relevant information from knowledge base:\n\n{context}"
@@ -109,23 +114,23 @@ def get_agent() -> Agent:
             ctx: RunContext[dict],
             per_message_sentiment: str,
             upsell_opportunity: str | None = None,
-            service_gap: str | None = None
+            service_gap: str | None = None,
         ) -> str:
             """
             Log insights for the current message or recent exchange.
             Call this DURING the conversation when you detect sentiments, upsell opportunities, or service gaps.
             """
             from app.models.insights import Insight
-            
+
             db = ctx.deps["db"]
             customer_id = ctx.deps["customer_id"]
-            
+
             insight = Insight(
                 customer_id=customer_id,
                 insight_type="message_level",
                 per_message_sentiment=per_message_sentiment,
                 upsell_opportunity=upsell_opportunity,
-                service_gap=service_gap
+                service_gap=service_gap,
             )
             db.add(insight)
             await db.commit()
@@ -141,17 +146,17 @@ def get_agent() -> Agent:
             aspect_based_sentiment: dict,
             trending_topics: list[str],
             traffic_rate: str | None = None,
-            traffic_to_conversion_rate: str | None = None
+            traffic_to_conversion_rate: str | None = None,
         ) -> str:
             """
             Log insights for the entire conversation.
             Call this at the END of the conversation to provide overall metrics.
             """
             from app.models.insights import Insight
-            
+
             db = ctx.deps["db"]
             customer_id = ctx.deps["customer_id"]
-            
+
             insight = Insight(
                 customer_id=customer_id,
                 insight_type="conversation_level",
@@ -162,7 +167,7 @@ def get_agent() -> Agent:
                 aspect_based_sentiment=aspect_based_sentiment,
                 trending_topics=trending_topics,
                 traffic_rate=traffic_rate,
-                traffic_to_conversion_rate=traffic_to_conversion_rate
+                traffic_to_conversion_rate=traffic_to_conversion_rate,
             )
             db.add(insight)
             await db.commit()
@@ -322,6 +327,7 @@ async def get_customer_messages(
 from sqlalchemy import update
 from sqlalchemy.sql import func
 
+
 async def save_messages(db: AsyncSession, customer_id: int, messages: bytes) -> None:
     """
     Save new messages for a customer and bump their updated_at timestamp.
@@ -331,16 +337,29 @@ async def save_messages(db: AsyncSession, customer_id: int, messages: bytes) -> 
         message_data=json.loads(messages),  # Store as dict for JSONB
     )
     db.add(message)
-    await db.execute(update(Customer).where(Customer.id == customer_id).values(updated_at=func.now()))
+    await db.execute(
+        update(Customer).where(Customer.id == customer_id).values(updated_at=func.now())
+    )
     await db.commit()
 
-async def save_manual_user_message(db: AsyncSession, customer_id: int, content: str) -> None:
-    m = ModelRequest(parts=[UserPromptPart(content=content, timestamp=datetime.now(timezone.utc))])
+
+async def save_manual_user_message(
+    db: AsyncSession, customer_id: int, content: str
+) -> None:
+    m = ModelRequest(
+        parts=[UserPromptPart(content=content, timestamp=datetime.now(timezone.utc))]
+    )
     msg_data = ModelMessagesTypeAdapter.dump_json([m])
     await save_messages(db, customer_id, msg_data)
 
-async def save_manual_agent_message(db: AsyncSession, customer_id: int, content: str) -> None:
-    m = ModelResponse(parts=[TextPart(content=f"[AGENT] {content}")], timestamp=datetime.now(timezone.utc))
+
+async def save_manual_agent_message(
+    db: AsyncSession, customer_id: int, content: str
+) -> None:
+    m = ModelResponse(
+        parts=[TextPart(content=f"[AGENT] {content}")],
+        timestamp=datetime.now(timezone.utc),
+    )
     msg_data = ModelMessagesTypeAdapter.dump_json([m])
     await save_messages(db, customer_id, msg_data)
 
@@ -359,14 +378,18 @@ async def get_chat_response(prompt: str, customer_id: int, db: AsyncSession) -> 
     """
     # Get chat history for context
     messages = await get_customer_messages(db, customer_id)
-    
+
     # Truncate history to prevent token limits (Groq TPM limit)
     # Keep up to 10 recent messages, ensuring the oldest is a UserPrompt
     if len(messages) > 10:
         messages = messages[-10:]
         while messages:
             first = messages[0]
-            if isinstance(first, ModelRequest) and first.parts and isinstance(first.parts[0], UserPromptPart):
+            if (
+                isinstance(first, ModelRequest)
+                and first.parts
+                and isinstance(first.parts[0], UserPromptPart)
+            ):
                 break
             messages.pop(0)
 
@@ -424,13 +447,17 @@ async def stream_chat_response(
 
     # Get chat history for context
     messages = await get_customer_messages(db, customer_id)
-    
+
     # Truncate history to prevent token limits (Groq TPM limit)
     if len(messages) > 10:
         messages = messages[-10:]
         while messages:
             first = messages[0]
-            if isinstance(first, ModelRequest) and first.parts and isinstance(first.parts[0], UserPromptPart):
+            if (
+                isinstance(first, ModelRequest)
+                and first.parts
+                and isinstance(first.parts[0], UserPromptPart)
+            ):
                 break
             messages.pop(0)
 
@@ -449,9 +476,7 @@ async def stream_chat_response(
     await save_messages(db, customer_id, result.new_messages_json())
 
 
-async def send_direct_message(
-    db: AsyncSession, customer_id: int, message: str
-) -> dict:
+async def send_direct_message(db: AsyncSession, customer_id: int, message: str) -> dict:
     """
     Send a direct message to a customer via their preferred channel.
 
@@ -499,7 +524,9 @@ async def send_direct_message(
                 )
 
             # Normalize phone number to WhatsApp format (phone@c.us)
-            phone = customer.phone_number.replace("+", "").replace(" ", "").replace("-", "")
+            phone = (
+                customer.phone_number.replace("+", "").replace(" ", "").replace("-", "")
+            )
             chat_id = f"{phone}@lid"
 
             response = await send_whatsapp_message(chat_id, message)
@@ -539,7 +566,9 @@ async def send_direct_message(
 
             return {
                 "success": True,
-                "message_id": str(response.get("message_id")) if response.get("message_id") else None,
+                "message_id": str(response.get("message_id"))
+                if response.get("message_id")
+                else None,
                 "timestamp": response.get("date", timestamp),
                 "channel": "telegram",
                 "customer_id": customer_id,
