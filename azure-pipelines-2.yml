@@ -1,8 +1,3 @@
-# Node.js
-# Build a general Node.js project with npm.
-# Add steps that analyze code, save build artifacts, deploy, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/javascript
-
 trigger:
 - main
 
@@ -13,9 +8,31 @@ steps:
 - task: NodeTool@0
   inputs:
     versionSpec: '20.x'
-  displayName: 'Install Node.js'
 
 - script: |
     npm install
     npm run build
-  displayName: 'npm install and build'
+  workingDirectory: client
+  displayName: 'Build Next.js'
+
+- task: ArchiveFiles@2
+  inputs:
+    rootFolderOrFile: client
+    includeRootFolder: false
+    archiveType: zip
+    archiveFile: $(Build.ArtifactStagingDirectory)/app.zip
+    replaceExistingArchive: true
+
+- upload: $(Build.ArtifactStagingDirectory)/app.zip
+  artifact: drop
+
+- task: AzureRmWebAppDeployment@5
+  inputs:
+    ConnectionType: 'AzureRM'
+    azureSubscription: 'Azure for Students(07c98b34-d9fe-41e6-a3a1-6ec6f54790f2)'
+    appType: 'webAppLinux'
+    WebAppName: 'chatiq'
+    packageForLinux: '$(Build.ArtifactStagingDirectory)/app.zip'
+    RuntimeStack: 'NODE|20-lts'
+    StartupCommand: 'npm start'
+    DeploymentTypeLinux: 'oneDeploy'
