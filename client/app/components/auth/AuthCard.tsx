@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { cn } from "../../lib/utils";
+import { API_URL } from "../../lib/auth";
 
 // Custom Google SVG icon
 const GoogleIcon = () => (
@@ -306,7 +307,7 @@ export function AuthCard({ mode = "login" }: { mode?: "login" | "signup" }) {
             <Button
               type="button"
               variant="outline"
-              onClick={() => window.location.href = "http://localhost:8000/api/v1/auth/oauth/google"}
+              onClick={() => window.location.href = `${API_URL}/auth/oauth/google`}
               className="w-full mt-8 h-12 text-sm font-medium rounded-lg bg-transparent border-border/60 hover:bg-secondary/40 transition-all active:scale-[0.98]"
             >
               <GoogleIcon />

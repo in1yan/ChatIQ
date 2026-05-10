@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const API_URL = "http://localhost:8000/api/v1";
+export const API_URL = "http://172.188.218.255:8000/api/v1";
 
 /**
  * Gets a fresh access token using the stored refresh token.

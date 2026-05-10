@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Toaster, toast } from '../components/ui/sonner';
+import { API_URL } from '../lib/auth';
 
 const AgentPage = () => {
   const router = useRouter();
@@ -30,7 +31,7 @@ const AgentPage = () => {
   const fetchDocuments = async () => {
     setIsLoadingDocs(true);
     try {
-      const res = await fetch("http://localhost:8000/api/v1/knowledge/documents?namespace=default");
+      const res = await fetch(`${API_URL}/knowledge/documents?namespace=default`);
       if (res.ok) {
         const data = await res.json();
         setDocuments(data.documents || []);
@@ -45,7 +46,7 @@ const AgentPage = () => {
   const fetchInstructions = async () => {
     setIsLoadingInstructions(true);
     try {
-      const res = await fetch("http://localhost:8000/api/v1/agent/config");
+      const res = await fetch(`${API_URL}/agent/config`);
       if (res.ok) {
         const data = await res.json();
         setInstructions(data.instructions || []);
@@ -77,7 +78,7 @@ const AgentPage = () => {
     formData.append("file", file);
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/knowledge/ingest?namespace=default", {
+      const res = await fetch(`${API_URL}/knowledge/ingest?namespace=default`, {
         method: "POST",
         body: formData,
       });
@@ -102,7 +103,7 @@ const AgentPage = () => {
 
   const handleDeleteDocument = async (fileName: string) => {
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/knowledge/documents?namespace=default&file_name=${encodeURIComponent(fileName)}`, {
+      const res = await fetch(`${API_URL}/knowledge/documents?namespace=default&file_name=${encodeURIComponent(fileName)}`, {
         method: "DELETE"
       });
       if (res.ok) {
@@ -116,28 +117,28 @@ const AgentPage = () => {
     }
   };
 
-  const handleSaveInstruction = async () => {
-    if (!instructionContent.trim()) return;
-    
-    setIsSaving(true);
-    
-    let updatedInstructions;
-    if (selectedInstruction) {
-      // Update existing instruction
-      updatedInstructions = instructions.map(inst => 
-        inst === selectedInstruction ? instructionContent : inst
-      );
-    } else {
-      // Add new instruction
-      updatedInstructions = [...instructions, instructionContent];
-    }
-    
-    try {
-      const res = await fetch("http://localhost:8000/api/v1/agent/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instructions: updatedInstructions }),
-      });
+   const handleSaveInstruction = async () => {
+     if (!instructionContent.trim()) return;
+     
+     setIsSaving(true);
+     
+     let updatedInstructions;
+     if (selectedInstruction) {
+       // Update existing instruction
+       updatedInstructions = instructions.map(inst => 
+         inst === selectedInstruction ? instructionContent : inst
+       );
+     } else {
+       // Add new instruction
+       updatedInstructions = [...instructions, instructionContent];
+     }
+     
+     try {
+       const res = await fetch(`${API_URL}/agent/config`, {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({ instructions: updatedInstructions }),
+       });
       if (!res.ok) throw new Error("Failed to save instructions");
       
       const data = await res.json();
@@ -158,15 +159,15 @@ const AgentPage = () => {
     }
   };
 
-  const handleDeleteInstruction = async (instruction: string) => {
-    const updatedInstructions = instructions.filter(inst => inst !== instruction);
-    
-    try {
-      const res = await fetch("http://localhost:8000/api/v1/agent/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ instructions: updatedInstructions }),
-      });
+   const handleDeleteInstruction = async (instruction: string) => {
+     const updatedInstructions = instructions.filter(inst => inst !== instruction);
+     
+     try {
+       const res = await fetch(`${API_URL}/agent/config`, {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({ instructions: updatedInstructions }),
+       });
       if (!res.ok) throw new Error("Failed to delete instruction");
       
       const data = await res.json();

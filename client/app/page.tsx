@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { MessageSquare, Loader2 } from "lucide-react";
 import { ChatSidebar } from "./components/ChatSidebar";
 import { ChatView } from "./components/ChatView";
-import { useAuth } from "./lib/auth";
+import { useAuth, API_URL } from "./lib/auth";
 
 export type Platform = "whatsapp" | "telegram" | "email" | "web";
 export interface Message {
@@ -45,7 +45,7 @@ export default function Home() {
     if (!isAuthenticated) return;
     const fetchCustomers = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/v1/chat/customers/all");
+        const res = await fetch(`${API_URL}/chat/customers/all`);
         if (!res.ok) return;
         const data = await res.json();
         
@@ -78,7 +78,7 @@ export default function Home() {
 
     const fetchMessages = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/api/v1/chat/${activeId}`);
+        const res = await fetch(`${API_URL}/chat/${activeId}`);
         if (!res.ok) return;
         const text = await res.text();
         const lines = text.split("\n").filter(Boolean);
@@ -132,7 +132,7 @@ export default function Home() {
     );
     
     try {
-      await fetch(`http://localhost:8000/api/v1/chat/${chatId}/reply`, {
+      await fetch(`${API_URL}/chat/${chatId}/reply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text }),
@@ -143,7 +143,7 @@ export default function Home() {
   const handleToggleAi = async (chatId: string) => {
     try {
       setChats(prev => prev.map(c => c.id === chatId ? { ...c, ai_paused: !c.ai_paused } : c));
-      await fetch(`http://localhost:8000/api/v1/chat/${chatId}/toggle-ai`, { method: "POST" });
+      await fetch(`${API_URL}/chat/${chatId}/toggle-ai`, { method: "POST" });
     } catch {}
   };
 
