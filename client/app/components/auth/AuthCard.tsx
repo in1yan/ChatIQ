@@ -2,20 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
-
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { Label } from "../ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
-import { cn } from "../../lib/utils";
 import { API_URL } from "../../lib/auth";
 
 // Custom Google SVG icon
@@ -45,42 +33,10 @@ const GoogleIcon = () => (
     />
   </svg>
 );
-
 export function AuthCard({ mode = "login" }: { mode?: "login" | "signup" }) {
   const isLogin = mode === "login";
   const router = useRouter();
 
-  // States
-  const [industry, setIndustry] = React.useState<string>("");
-  const [email, setEmail] = React.useState<string>("");
-  const [password, setPassword] = React.useState<string>("");
-  const [emailError, setEmailError] = React.useState<string>("");
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setEmailError("");
-
-    const DUMMY_EMAIL = "demo@chatiq.com";
-    const DUMMY_PASSWORD = "password123";
-
-    if (isLogin) {
-      if (email === DUMMY_EMAIL && password === DUMMY_PASSWORD) {
-        router.push("/");
-      } else {
-        setEmailError("Incorrect email or password");
-      }
-    } else {
-      if (!email.includes("@") || password.length < 6) {
-        setEmailError("Please enter a valid email & secure password");
-      } else {
-        router.push("/onboarding");
-      }
-    }
-  };
-
-  // Minimal input style for the premium look
-  const inputStyle =
-    "border-0 border-b border-border/50 bg-transparent rounded-none px-0 py-5 shadow-none focus-visible:ring-0 focus-visible:border-primary text-base transition-colors";
 
   return (
     <div className="flex-1 flex w-full relative min-h-screen">
@@ -165,155 +121,18 @@ export function AuthCard({ mode = "login" }: { mode?: "login" | "signup" }) {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-8">
-            
-            {isLogin ? (
-              <div className="space-y-6 animate-[fade-in_400ms_ease-out]">
-                <div className="space-y-1 relative group">
-                  <div className="flex justify-between items-end">
-                    <Label htmlFor="email-login" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-                      Work Email
-                    </Label>
-                    <span className="text-[10px] text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded">hint: demo@chatiq.com</span>
-                  </div>
-                  <Input
-                    id="email-login"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@company.com"
-                    required
-                    aria-required="true"
-                    aria-invalid={!!emailError}
-                    aria-describedby={emailError ? "email-error" : undefined}
-                    className={cn(inputStyle, emailError && "border-destructive/60 focus-visible:border-destructive")}
-                  />
-                  {emailError && <p id="email-error" className="text-xs text-destructive mt-2 absolute -bottom-5 left-0" role="alert">{emailError}</p>}
-                </div>
-
-                <div className="space-y-1 pt-2">
-                  <div className="flex justify-between items-end">
-                    <Label htmlFor="password-login" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-                      Password
-                    </Label>
-                    <span className="text-[10px] text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded">hint: password123</span>
-                  </div>
-                  <Input
-                    id="password-login"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                    aria-required="true"
-                    className={inputStyle}
-                  />
-                </div>
-
-                <div className="flex justify-start pt-2">
-                  <Link href="#" className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
-                    Forgot your password?
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-6 animate-[fade-in_400ms_ease-out]">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-1">
-                    <Label htmlFor="your-name" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Your name</Label>
-                    <Input id="your-name" placeholder="Priya M." className={inputStyle} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="business-name" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Business name</Label>
-                    <Input id="business-name" placeholder="Spice Garden" className={inputStyle} />
-                  </div>
-                </div>
-
-                <div className="space-y-1 relative group">
-                  <Label htmlFor="work-email" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Work Email</Label>
-                  <Input
-                    id="work-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@company.com"
-                    className={cn(inputStyle, emailError && "border-destructive/60 focus-visible:border-destructive")}
-                  />
-                  {emailError && <p className="text-xs text-destructive mt-2 absolute -bottom-5 left-0">{emailError}</p>}
-                </div>
-
-                <div className="space-y-1 pt-2">
-                  <Label htmlFor="industry" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Industry</Label>
-                  <Select value={industry} onValueChange={setIndustry}>
-                    <SelectTrigger className="border-0 border-b border-border/50 bg-transparent rounded-none px-0 py-5 shadow-none focus:ring-0 focus:border-primary text-base">
-                      <SelectValue placeholder="Select an industry" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="restaurant">Restaurant / Food & Beverage</SelectItem>
-                      <SelectItem value="retail">Retail e-Commerce</SelectItem>
-                      <SelectItem value="services">Services</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Conditional Industry Input with smooth animation */}
-                <div className={cn(
-                  "space-y-1 transition-all duration-300 ease-out overflow-hidden border-l-[3px] border-primary/40 pl-4",
-                  industry === "other" ? "h-[70px] opacity-100 mt-6" : "h-0 opacity-0 mt-0 pointer-events-none"
-                )}>
-                  <Label htmlFor="custom-industry" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Please specify</Label>
-                  <Input
-                    id="custom-industry"
-                    placeholder="e.g. Healthcare, Real Estate..."
-                    className={inputStyle}
-                  />
-                </div>
-
-                <div className="space-y-1 pt-2">
-                  <Label htmlFor="password-signup" className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">Password</Label>
-                  <Input
-                    id="password-signup"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Create a strong password"
-                    className={inputStyle}
-                  />
-                </div>
-              </div>
-            )}
-
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-8">
             <div className="pt-4">
-              <Button type="submit" className="w-full h-12 text-base font-medium rounded-lg shadow-md transition-all active:scale-[0.98]">
-                {isLogin ? "Log In" : "Create Account"} <ArrowRight className="ml-2 h-4 w-4" />
+              <Button
+                type="button"
+                onClick={() => window.location.href = `${API_URL}/auth/oauth/google`}
+                className="w-full h-12 text-base font-medium rounded-lg shadow-md transition-all active:scale-[0.98] bg-primary hover:bg-primary/90 text-white"
+              >
+                <GoogleIcon />
+                <span className="ml-3">Continue with Google</span>
               </Button>
             </div>
           </form>
-
-          {/* Social Auth */}
-          <div className="mt-10">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border/40" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-4 text-muted-foreground tracking-widest bg-opacity-100">
-                  Or
-                </span>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => window.location.href = `${API_URL}/auth/oauth/google`}
-              className="w-full mt-8 h-12 text-sm font-medium rounded-lg bg-transparent border-border/60 hover:bg-secondary/40 transition-all active:scale-[0.98]"
-            >
-              <GoogleIcon />
-              <span className="ml-3">Continue with Google</span>
-            </Button>
-          </div>
 
           <p className="mt-10 text-center text-xs text-muted-foreground">
             By continuing, you agree to ChatIQ&apos;s{" "}

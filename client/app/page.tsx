@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { MessageSquare, Loader2 } from "lucide-react";
 import { ChatSidebar } from "./components/ChatSidebar";
 import { ChatView } from "./components/ChatView";
+import LandingPage from "./components/LandingPage";
 import { useAuth, API_URL } from "./lib/auth";
 
 export type Platform = "whatsapp" | "telegram" | "email" | "web";
@@ -27,7 +27,6 @@ export interface Chat {
 
 export default function Home() {
   const { isAuthenticated } = useAuth();
-  const router = useRouter();
 
   const [chats, setChats] = useState<Chat[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -35,11 +34,7 @@ export default function Home() {
   // [TODO]
   // [FIXME]
   // [WARN]
-  useEffect(() => {
-    if (isAuthenticated === false) {
-      router.push("/login");
-    }
-  }, [isAuthenticated, router]);
+  // No redirect, we show the landing page if not authenticated
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -149,12 +144,16 @@ export default function Home() {
 
   const activeChat = chats.find((c) => c.id === activeId) ?? null;
 
-  if (isAuthenticated === null || isAuthenticated === false) {
+  if (isAuthenticated === null) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (isAuthenticated === false) {
+    return <LandingPage />;
   }
 
   return (
