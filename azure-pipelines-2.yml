@@ -15,9 +15,14 @@ steps:
   workingDirectory: client
   displayName: 'Build Next.js'
 
+- script: |
+    cp -r client/.next/static client/.next/standalone/.next/
+    cp -r client/public client/.next/standalone/
+  displayName: 'Copy static assets'
+
 - task: ArchiveFiles@2
   inputs:
-    rootFolderOrFile: client
+    rootFolderOrFile: client/.next/standalone
     includeRootFolder: false
     archiveType: zip
     archiveFile: $(Build.ArtifactStagingDirectory)/app.zip
@@ -34,5 +39,5 @@ steps:
     WebAppName: 'chatiq'
     packageForLinux: '$(Build.ArtifactStagingDirectory)/app.zip'
     RuntimeStack: 'NODE|20-lts'
-    StartupCommand: 'npm start'
+    StartupCommand: 'node server.js'
     DeploymentTypeLinux: 'oneDeploy'
