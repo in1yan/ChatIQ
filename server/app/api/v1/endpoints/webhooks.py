@@ -10,13 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.db.session import get_db
-from app.services.telegram.webhook import send_telegram_message, send_typing_action
 from app.services.agent.main import (
     get_chat_response,
     get_or_create_customer,
-    save_manual_user_message,
     save_manual_agent_message,
+    save_manual_user_message,
 )
+from app.services.telegram.webhook import send_telegram_message, send_typing_action
 from app.services.whatsapp.whatsapp import (
     send_whatsapp_message,
     start_typing,
@@ -53,24 +53,26 @@ async def whatsapp_webhook(request: Request, db: AsyncSession = Depends(get_db))
         event = data.get("event", "message")
 
         from_me = payload.get("fromMe", False)
-        
+
         # Only process message events
         if event != "message":
             logger.info(f"⏭️ Skipping non-message event: {event}")
             return {"status": "skipped", "reason": f"event_type_{event}"}
-            
+
         print(payload)
         # Extract message details
         chat_id = payload.get("from")
-        
+
         # If it's sent by us (business), then the customer is 'to'
         if from_me:
             chat_id = payload.get("to")
-            
+
         print(chat_id)
         print(payload.get("_data"))
         print(payload.get("_data").get("notifyName") if payload.get("_data") else None)
-        full_name = payload.get("_data").get("notifyName") if payload.get("_data") else None
+        full_name = (
+            payload.get("_data").get("notifyName") if payload.get("_data") else None
+        )
         message_text = payload.get("body")
         message_id = payload.get("id")
 
@@ -111,7 +113,7 @@ async def whatsapp_webhook(request: Request, db: AsyncSession = Depends(get_db))
                 # This was a message sent externally via WhatsApp phone/web by a human agent
                 logger.info(f"💾 Saving external business reply for {customer.id}")
                 await save_manual_agent_message(db, customer.id, message_text)
-                
+
                 # Implicitly pause the AI if the human agent took over externally
                 customer.ai_paused = True
                 await db.commit()
@@ -125,7 +127,7 @@ async def whatsapp_webhook(request: Request, db: AsyncSession = Depends(get_db))
                     "customer_id": customer.id,
                     "chat_id": chat_id,
                     "message": message_text,
-                    "reason": "ai_paused"
+                    "reason": "ai_paused",
                 }
 
             # Get AI response
@@ -134,7 +136,7 @@ async def whatsapp_webhook(request: Request, db: AsyncSession = Depends(get_db))
             )
 
             ai_response = response_data["ai_response"]["content"]
-
+            print(ai_response)
             logger.info(f"🤖 AI Response: {ai_response[:100]}...")
 
             # Send response back to WhatsApp
@@ -248,7 +250,9 @@ async def telegram_webhook(
         if not full_name:
             full_name = username or f"User {user_id}"
 
-        logger.info(f"👤 Processing message from {full_name} (@{username}): {message_text}")
+        logger.info(
+            f"👤 Processing message from {full_name} (@{username}): {message_text}"
+        )
 
         # Show typing action
         await send_typing_action(chat_id)
@@ -275,7 +279,7 @@ async def telegram_webhook(
                     "chat_id": chat_id,
                     "username": username,
                     "message": message_text,
-                    "reason": "ai_paused"
+                    "reason": "ai_paused",
                 }
 
             # Get AI response
