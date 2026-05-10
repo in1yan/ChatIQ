@@ -34,20 +34,12 @@ services:
     build:
       context: ./client
       dockerfile: Dockerfile
-      args:
-        - NODE_ENV=development
     container_name: chatiq-client
     ports:
-      - "3001:3001"
+      - "3001:3000"
     environment:
-      - NODE_ENV=development
-      - PORT=3001
+      - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=http://server:8000
-    volumes:
-      - ./client:/app
-      - /app/node_modules
-      - /app/.next
-    command: pnpm dev
     restart: unless-stopped
     depends_on:
       - server
